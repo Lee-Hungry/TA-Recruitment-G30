@@ -1,5 +1,5 @@
 # TA-Recruitment-G30
-This is the group project assignment for Software Engineering Course Group 30.
+This is the group project assignment for EBU6304 Software Engineering Course Group 30.
 
 # Group Name-List
 
