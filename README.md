@@ -7,3 +7,4 @@ This is the group project assignment for Software Engineering Course Group 30.
 - qrsikno2: 190898878(Support TA)
 - Lee-Hungry: 231220507(Lead)
 - Hanhan-2005: 231222615(Member)
+- MobiusRita: 213222121(Member)
