@@ -10,3 +10,4 @@ This is the group project assignment for Software Engineering Course Group 30.
 - MobiusRita: 213222121(Member)
 - jersey945: 231222567(Member)
 - Lq999-png: 231220068(Member)
+- ZhixianDong: 231220703(Member)
