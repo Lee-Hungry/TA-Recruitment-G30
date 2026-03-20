@@ -1,0 +1,2 @@
+user_id,email,password_hash,role,status,created_at,updated_at
+mo-001,mo@g30.local,mo123456,MO,ACTIVE,2026-03-20T11:20:00+08:00,2026-03-20T11:20:00+08:00
