@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.group30.tarecruitment.auth.AuthServiceTest" time="0.088" tests="2" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="java.specification.version" value="21"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="GBK"/>
+    <property name="java.class.path" value="G:\Projects\se_group30\member_repos\Lee-Hungry\target\test-classes;G:\Projects\se_group30\member_repos\Lee-Hungry\target\classes;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\86180\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\86180\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\86180\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\86180\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;"/>
+    <property name="java.vm.vendor" value="Azul Systems, Inc."/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="http://www.azul.com/"/>
+    <property name="user.timezone" value="Asia/Shanghai"/>
+    <property name="os.name" value="Windows 11"/>
+    <property name="java.vm.specification.version" value="21"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="CN"/>
+    <property name="sun.boot.library.path" value="F:\Program Files\Zulu\zulu-21\bin"/>
+    <property name="sun.java.command" value="C:\Users\86180\AppData\Local\Temp\surefire14158631538528483955\surefirebooter-20260320180334519_3.jar C:\Users\86180\AppData\Local\Temp\surefire14158631538528483955 2026-03-20T18-03-34_027-jvmRun1 surefire-20260320180334519_1tmp surefire_0-20260320180334519_2tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="test" value="Auth*"/>
+    <property name="surefire.test.class.path" value="G:\Projects\se_group30\member_repos\Lee-Hungry\target\test-classes;G:\Projects\se_group30\member_repos\Lee-Hungry\target\classes;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\86180\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\86180\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\86180\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\86180\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\86180\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="C:\Users\86180"/>
+    <property name="user.language" value="zh"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2024-04-16"/>
+    <property name="java.home" value="F:\Program Files\Zulu\zulu-21"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="G:\Projects\se_group30\member_repos\Lee-Hungry"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="surefire.real.class.path" value="C:\Users\86180\AppData\Local\Temp\surefire14158631538528483955\surefirebooter-20260320180334519_3.jar"/>
+    <property name="user.script" value=""/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="21.0.3+9-LTS"/>
+    <property name="user.name" value="86180"/>
+    <property name="stdout.encoding" value="GBK"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Zulu21.34+19-CA"/>
+    <property name="localRepository" value="C:\Users\86180\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="http://www.azul.com/support/"/>
+    <property name="java.io.tmpdir" value="C:\Users\86180\AppData\Local\Temp\"/>
+    <property name="java.version" value="21.0.3"/>
+    <property name="user.dir" value="G:\Projects\se_group30\member_repos\Lee-Hungry"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="native.encoding" value="GBK"/>
+    <property name="java.library.path" value="F:\Program Files\Zulu\zulu-21\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\PowerShell\7;C:\Users\86180\.codex\tmp\arg0\codex-arg0bVMfJ5;F:\Users\86180\AppData\Local\Programs\Microsoft VS Code;F:\Program Files\Zulu\zulu-21\bin\;C:\Program Files (x86)\Common Files\Intel\Shared Libraries\redist\intel64\compiler;C:\Program Files\Common Files\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Program Files\Zulu\zulu-17\bin\;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.7\libnvvp;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\dotnet\;C:\Program Files (x86)\Gpg4win\..\GnuPG\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2022.2.0\;D:\flutter\bin;D:\Program Files (x86)\Eziriz\.NET Reactor;D:\Program Files (x86)\Xftp\;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\ProgramData\chocolatey\bin;F:\Tesseract;F:\Program Files (x86)\NSIS;F:\Program Files\upx;C:\Users\86180\AppData\Local\Microsoft\WindowsApps;C:\Users\86180\.dotnet\tools;C:\Users\86180\AppData\Local\Programs\Fiddler;C:\Program Files\mingw64\bin;D:\Program Files\Bandizip;F:\Program Files\JetBrains\WebStorm 2023.3.1\bin;F:\Users\86180\AppData\Local\Programs\MiKTeX\miktex\bin\x64\;C:\Users\86180\AppData\Local\Programs\oh-my-posh\bin;F:\Users\86180\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\86180\AppData\Local\Programs\Ollama;D:\Program Files\Git\cmd;F:\Program Files\Graphviz\bin;F:\Users\86180\AppData\Roaming\nvm;F:\Program Files\nodejs;c:\Users\86180\AppData\Local\Programs\Cursor\resources\app\bin;F:\P;F:\Program Files\Go\bin;C:\Users\86180\.local\bin;C:\Users\86180\scoop\shims;F:\Program Files (x86)\Python312\Scripts\;F:\Program Files (x86)\Python312\;F:\Program Files (x86)\Tencent\寰俊web寮�鍙戣�呭伐鍏穃dll;F:\Program Files\JetBrains\IntelliJ IDEA 2024.1.1\bin;F:\Program Files\Neovim\bin;F:\intelFPGA_lite\18.1\modelsim_ase\win32aloem;F:\questasim64_2020.1\win64;G:\tomcat\lib;G:\tomcat\bin;G:\tomcat\lib\servlet-api.jar;C:\Users\86180\AppData\Local\Muse Hub\lib;F:\ffmpeg\bin;C:\Users\86180\go\bin;C:\Users\86180\AppData\Local\Pandoc\;C:\Users\86180\AppData\Local\GitHubDesktop\bin;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;D:\Program Files (x86)\NetSarang\Xftp 8\;F:\Program Files\PuTTY\;C:\Program Files\PowerShell\7\;C:\Program Files\Pandoc\;F:\Program Files\WorldPainter;F:\Program Files\WorldPainter2.7.16;F:\Program Files\nodejs\;C:\Users\86180\.cargo\bin;C:\Users\86180\AppData\Local\pnpm;C:\Users\86180\.local\bin;C:\Users\86180\scoop\shims;C:\Users\86180\AppData\Local\Microsoft\WindowsApps;C:\Users\86180\.dotnet\tools;C:\Users\86180\AppData\Local\Programs\Fiddler;C:\Program Files\mingw64\bin;D:\Program Files\Bandizip;F:\Program Files\JetBrains\WebStorm 2023.3.1\bin;C:\Users\86180\AppData\Local\Programs\oh-my-posh\bin;F:\Users\86180\AppData\Local\Programs\Microsoft VS Code\bin;F:\Program Files\JetBrains\IntelliJ IDEA 2024.1.1\bin;F:\Program Files\Neovim\bin;F:\Users\86180\AppData\Roaming\nvm;F:\Program Files\nodejs;F:\intelFPGA_lite\18.1\modelsim_ase\win32aloem;F:\questasim64_2020.1\win64;C:\Users\86180\AppData\Local\Muse Hub\lib;C:\Users\86180\go\bin;C:\Users\86180\AppData\Local\Pandoc\;C:\Users\86180\AppData\Local\GitHubDesktop\bin;C:\Users\86180\go\bin;C:\Users\86180\AppData\Local\Microsoft\WindowsApps;F:\Users\86180\AppData\Local\Programs\Python\Python312;F:\Users\86180\AppData\Local\Programs\Python\Python312\Scripts;G:\protoc\bin;G:\texlive\2025\bin\windows;C:\Users\86180\.bun\bin;C:\Users\86180\.dotnet\tools;F:\Users\86180\AppData\Local\Programs\Zed\bin;F:\Program Files\LOVE;C:\Users\86180\tools\apache-maven-3.9.9\bin;C:\Users\86180\AppData\Roaming\npm;c:\Users\86180\.vscode\extensions\openai.chatgpt-26.313.41514-win32-x64\bin\windows-x86_64;."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="GBK"/>
+    <property name="java.vendor" value="Azul Systems, Inc."/>
+    <property name="java.vm.version" value="21.0.3+9-LTS"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="65.0"/>
+  </properties>
+  <testcase name="shouldLoginAndPersistSession" classname="com.group30.tarecruitment.auth.AuthServiceTest" time="0.081"/>
+  <testcase name="shouldFailOnRoleMismatch" classname="com.group30.tarecruitment.auth.AuthServiceTest" time="0.006"/>
+</testsuite>
