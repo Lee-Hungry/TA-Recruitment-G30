@@ -1,10 +1,15 @@
 package com.group30.tarecruitment;
 
+import com.group30.tarecruitment.login.CsvSessionTokenRepository;
+import com.group30.tarecruitment.login.CsvUserCredentialRepository;
+import com.group30.tarecruitment.login.TaLoginService;
 import com.group30.tarecruitment.registration.CsvUserRepository;
 import com.group30.tarecruitment.registration.TaRegistrationService;
+import com.group30.tarecruitment.ui.TaLoginPanel;
 import com.group30.tarecruitment.ui.TaRegistrationPanel;
 
 import javax.swing.JFrame;
+import javax.swing.JTabbedPane;
 import javax.swing.SwingUtilities;
 import java.nio.file.Path;
 
@@ -12,13 +17,22 @@ public class AppLauncher {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("TA Registration");
+            JFrame frame = new JFrame("TA Recruitment");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(500, 260);
+            frame.setSize(580, 320);
             frame.setLocationRelativeTo(null);
-            frame.setContentPane(new TaRegistrationPanel(
-                    new TaRegistrationService(new CsvUserRepository(Path.of("data", "user_account.csv")))
+
+            Path userCsv = Path.of("data", "user_account.csv");
+            JTabbedPane tabs = new JTabbedPane();
+            tabs.addTab("TA Registration", new TaRegistrationPanel(
+                    new TaRegistrationService(new CsvUserRepository(userCsv))
             ));
+            tabs.addTab("TA Login", new TaLoginPanel(new TaLoginService(
+                    new CsvUserCredentialRepository(userCsv),
+                    new CsvSessionTokenRepository(Path.of("data", "session_token.csv"))
+            )));
+
+            frame.setContentPane(tabs);
             frame.setVisible(true);
         });
     }
