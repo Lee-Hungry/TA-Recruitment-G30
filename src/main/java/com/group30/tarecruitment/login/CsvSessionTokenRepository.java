@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CsvSessionTokenRepository {
 
@@ -21,6 +23,51 @@ public class CsvSessionTokenRepository {
             Files.writeString(csvPath, line + System.lineSeparator(), StandardOpenOption.APPEND);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to append session", e);
+        }
+    }
+
+    public boolean revoke(String sessionId, String revokedAt) {
+        ensureFileExists();
+        try {
+            List<String> lines = Files.readAllLines(csvPath);
+            if (lines.isEmpty()) {
+                return false;
+            }
+
+            boolean updated = false;
+            List<String> rewritten = new ArrayList<>();
+            rewritten.add(lines.get(0));
+
+            for (int i = 1; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+                String[] parts = line.split(",", -1);
+                if (parts.length < 6) {
+                    continue;
+                }
+                if (parts[0].equals(sessionId)) {
+                    parts[3] = revokedAt;
+                    parts[4] = revokedAt;
+                    updated = true;
+                }
+                rewritten.add(String.join(",", parts));
+            }
+
+            if (!updated) {
+                return false;
+            }
+
+            Files.writeString(
+                    csvPath,
+                    String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+            return true;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to revoke session", e);
         }
     }
 

@@ -35,4 +35,8 @@ public class TaLoginService {
         sessionRepository.append(sessionId, user.userId(), OffsetDateTime.now().toString(), clientIp);
         return TaLoginResult.ok(sessionId);
     }
+
+    public boolean logout(String sessionId) {
+        return sessionRepository.revoke(sessionId, OffsetDateTime.now().toString());
+    }
 }

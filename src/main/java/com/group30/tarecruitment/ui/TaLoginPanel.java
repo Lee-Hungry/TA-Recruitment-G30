@@ -4,12 +4,15 @@ import com.group30.tarecruitment.login.TaLoginResult;
 import com.group30.tarecruitment.login.TaLoginService;
 
 import javax.swing.JButton;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import java.awt.GridLayout;
+import java.awt.Window;
 
 public class TaLoginPanel extends JPanel {
 
@@ -34,7 +37,19 @@ public class TaLoginPanel extends JPanel {
                     "127.0.0.1"
             );
             if (result.success()) {
-                JOptionPane.showMessageDialog(this, "Login success. Session=" + result.sessionId());
+                Window currentWindow = SwingUtilities.getWindowAncestor(this);
+                TaDashboardFrame dashboardFrame = new TaDashboardFrame(result.sessionId(), loginService, () -> {
+                    JFrame loginFrame = new JFrame("TA Login");
+                    loginFrame.setSize(460, 220);
+                    loginFrame.setLocationRelativeTo(null);
+                    loginFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                    loginFrame.setContentPane(new TaLoginPanel(loginService));
+                    loginFrame.setVisible(true);
+                });
+                dashboardFrame.setVisible(true);
+                if (currentWindow != null) {
+                    currentWindow.dispose();
+                }
                 return;
             }
             JOptionPane.showMessageDialog(this, "Login failed: " + result.errorCode());
