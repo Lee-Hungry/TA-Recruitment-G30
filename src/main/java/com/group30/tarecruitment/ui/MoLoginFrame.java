@@ -2,7 +2,6 @@ package com.group30.tarecruitment.ui;
 
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
-import com.group30.tarecruitment.mo.MoRouteGuard;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -40,13 +39,13 @@ public class MoLoginFrame extends JFrame {
                 return;
             }
 
-            MoRouteGuard guard = new MoRouteGuard();
-            if (!guard.canAccessMoDashboard(result.sessionRole())) {
-                JOptionPane.showMessageDialog(this, "Route guard blocked non-MO session.");
+            if (!loginService.canAccessMoDashboard(result.sessionId(), result.sessionRole())) {
+                JOptionPane.showMessageDialog(this, "Route guard blocked access: role mismatch or session expired.");
                 return;
             }
 
             new MoDashboardFrame().setVisible(true);
+            dispose();
         });
 
         setContentPane(panel);

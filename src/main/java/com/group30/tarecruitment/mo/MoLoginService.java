@@ -6,10 +6,12 @@ public class MoLoginService {
 
     private final CsvMoAccountRepository accountRepository;
     private final CsvSessionRepository sessionRepository;
+    private final MoRouteGuard routeGuard;
 
     public MoLoginService(CsvMoAccountRepository accountRepository, CsvSessionRepository sessionRepository) {
         this.accountRepository = accountRepository;
         this.sessionRepository = sessionRepository;
+        this.routeGuard = new MoRouteGuard();
     }
 
     public MoLoginResult login(String email, String password) {
@@ -31,5 +33,18 @@ public class MoLoginService {
 
         String sessionId = sessionRepository.createMoSession(account.userId());
         return MoLoginResult.ok(sessionId);
+    }
+
+    public boolean canAccessMoDashboard(String sessionId, String sessionRole) {
+        if (!routeGuard.canAccessMoDashboard(sessionRole)) {
+            return false;
+        }
+        return sessionRepository.findBySessionId(sessionId)
+                .map(routeGuard::canAccessMoDashboard)
+                .orElse(false);
+    }
+
+    public boolean expireSession(String sessionId) {
+        return sessionRepository.expireSessionNow(sessionId);
     }
 }
