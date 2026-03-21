@@ -56,11 +56,14 @@ public class LoginFrame extends JFrame {
     }
 
     private void route(String route) {
+        DashboardFrame dashboardFrame;
         switch (route) {
-            case "TA_DASHBOARD" -> new DashboardFrame("TA Dashboard").setVisible(true);
-            case "MO_DASHBOARD" -> new DashboardFrame("MO Dashboard").setVisible(true);
-            case "ADMIN_DASHBOARD" -> new DashboardFrame("Admin Dashboard").setVisible(true);
+            case "TA_DASHBOARD" -> dashboardFrame = new DashboardFrame("TA Dashboard");
+            case "MO_DASHBOARD" -> dashboardFrame = new DashboardFrame("MO Dashboard");
+            case "ADMIN_DASHBOARD" -> dashboardFrame = new DashboardFrame("Admin Dashboard");
             default -> throw new IllegalStateException("Unknown route: " + route);
         }
+        dashboardFrame.setVisible(true);
+        dispose();
     }
 }

@@ -11,3 +11,12 @@ This is the group project assignment for EBU6304 Software Engineering Course Gro
 - jersey945: 231222567(Member)
 - Lq999-png: 231220068(Member)
 - ZhixianDong: 231220703(Member)
+
+# Build & Run
+
+Use Maven to package and run the Swing app:
+
+```bash
+mvn clean package
+mvn -q exec:java -Dexec.mainClass="com.group30.tarecruitment.AppLauncher"
+```
