@@ -1,7 +1,9 @@
 package com.group30.tarecruitment.job;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
@@ -16,6 +18,7 @@ public class CsvJobPostingRepository {
     }
 
     public void save(JobPosting jobPosting) {
+        ensureFileExists();
         String line = String.join(",",
                 jobPosting.jobId(),
                 jobPosting.createdBy(),
@@ -28,7 +31,21 @@ public class CsvJobPostingRepository {
                 jobPosting.jobType(),
                 jobPosting.status());
         try {
-            Files.writeString(csvPath, line + System.lineSeparator(), StandardOpenOption.APPEND);
+            String original = Files.readString(csvPath);
+            String merged = original + line + System.lineSeparator();
+            Path tempFile = csvPath.resolveSibling(csvPath.getFileName() + ".tmp");
+            Files.writeString(
+                    tempFile,
+                    merged,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+            try {
+                Files.move(tempFile, csvPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(tempFile, csvPath, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save job posting", e);
         }

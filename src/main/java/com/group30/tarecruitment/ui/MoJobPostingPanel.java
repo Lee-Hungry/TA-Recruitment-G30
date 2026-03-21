@@ -43,13 +43,19 @@ public class MoJobPostingPanel extends JPanel {
 
         submit.addActionListener(e -> {
             try {
+                int hoursPerWeek;
+                try {
+                    hoursPerWeek = Integer.parseInt(hours.getText().trim());
+                } catch (NumberFormatException ex) {
+                    throw new IllegalArgumentException("INVALID_HOURS_PER_WEEK");
+                }
                 postingService.publish(new JobPostingRequest(
                         createdBy.getText().trim(),
                         title.getText().trim(),
                         moduleCode.getText().trim(),
                         description.getText().trim(),
                         skills.getText().trim(),
-                        Integer.parseInt(hours.getText().trim()),
+                        hoursPerWeek,
                         deadline.getText().trim(),
                         "TA"
                 ));
