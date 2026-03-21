@@ -5,9 +5,13 @@ import com.group30.tarecruitment.auth.repository.CsvSessionTokenRepository;
 import com.group30.tarecruitment.auth.repository.CsvUserAccountRepository;
 import com.group30.tarecruitment.login.CsvUserCredentialRepository;
 import com.group30.tarecruitment.login.TaLoginService;
+import com.group30.tarecruitment.mo.CsvMoAccountRepository;
+import com.group30.tarecruitment.mo.CsvSessionRepository;
+import com.group30.tarecruitment.mo.MoLoginService;
 import com.group30.tarecruitment.registration.CsvUserRepository;
 import com.group30.tarecruitment.registration.TaRegistrationService;
 import com.group30.tarecruitment.ui.LoginFrame;
+import com.group30.tarecruitment.ui.MoLoginFrame;
 import com.group30.tarecruitment.ui.TaLoginPanel;
 import com.group30.tarecruitment.ui.TaRegistrationPanel;
 
@@ -25,7 +29,7 @@ public class AppLauncher {
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("TA Recruitment");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(620, 360);
+            frame.setSize(680, 380);
             frame.setLocationRelativeTo(null);
 
             Path userCsv = Path.of("data", "user_account.csv");
@@ -39,6 +43,16 @@ public class AppLauncher {
                     new CsvUserCredentialRepository(userCsv),
                     new com.group30.tarecruitment.login.CsvSessionTokenRepository(sessionCsv)
             )));
+
+            MoLoginService moLoginService = new MoLoginService(
+                    new CsvMoAccountRepository(userCsv),
+                    new CsvSessionRepository(sessionCsv)
+            );
+            JPanel moTab = new JPanel(new BorderLayout());
+            JButton openMoLogin = new JButton("Open MO Login Window");
+            openMoLogin.addActionListener(e -> new MoLoginFrame(moLoginService).setVisible(true));
+            moTab.add(openMoLogin, BorderLayout.CENTER);
+            tabs.addTab("MO Login", moTab);
 
             AuthService authService = new AuthService(
                     new CsvUserAccountRepository(userCsv),
