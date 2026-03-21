@@ -1,5 +1,6 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.profile.TaProfile;
 import com.group30.tarecruitment.profile.TaProfileService;
 
 import javax.swing.JButton;
@@ -21,7 +22,8 @@ public class TaProfilePanel extends JPanel {
         JTextField gpa = new JTextField();
         JTextField skills = new JTextField();
         JTextField availability = new JTextField();
-        JButton save = new JButton("Save Profile");
+        JButton load = new JButton("Load Profile");
+        JButton save = new JButton("Save/Update");
 
         add(new JLabel("User ID"));
         add(userId);
@@ -37,12 +39,29 @@ public class TaProfilePanel extends JPanel {
         add(skills);
         add(new JLabel("Availability"));
         add(availability);
-        add(new JLabel(""));
+        add(load);
         add(save);
+
+        load.addActionListener(e -> {
+            try {
+                TaProfile profile = profileService.loadByUserId(userId.getText().trim());
+                fullName.setText(profile.fullName());
+                studentId.setText(profile.studentId());
+                studentId.setEditable(false);
+                degree.setText(profile.degreeProgramme());
+                gpa.setText(profile.gpa());
+                skills.setText(profile.skills());
+                availability.setText(profile.availability());
+                JOptionPane.showMessageDialog(this, "Profile loaded.");
+            } catch (IllegalArgumentException ex) {
+                studentId.setEditable(true);
+                JOptionPane.showMessageDialog(this, ex.getMessage());
+            }
+        });
 
         save.addActionListener(e -> {
             try {
-                profileService.createFirstProfile(
+                profileService.saveOrUpdate(
                         userId.getText().trim(),
                         fullName.getText().trim(),
                         studentId.getText().trim(),

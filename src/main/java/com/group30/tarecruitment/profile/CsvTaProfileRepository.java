@@ -41,6 +41,61 @@ public class CsvTaProfileRepository {
         }
     }
 
+    public boolean updateByUserId(TaProfile profile) {
+        ensureFileExists();
+        try {
+            List<String> lines = Files.readAllLines(csvPath);
+            if (lines.isEmpty()) {
+                return false;
+            }
+
+            boolean updated = false;
+            List<String> rewritten = new ArrayList<>();
+            rewritten.add(lines.get(0));
+
+            for (int i = 1; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                String[] parts = line.split(",", -1);
+                if (parts.length < 9) {
+                    continue;
+                }
+                if (parts[1].equals(profile.userId())) {
+                    rewritten.add(String.join(",",
+                            profile.taProfileId(),
+                            profile.userId(),
+                            profile.fullName(),
+                            profile.studentId(),
+                            profile.degreeProgramme(),
+                            profile.gpa(),
+                            profile.skills(),
+                            profile.availability(),
+                            profile.cvFilePath()
+                    ));
+                    updated = true;
+                } else {
+                    rewritten.add(line);
+                }
+            }
+
+            if (!updated) {
+                return false;
+            }
+
+            Files.writeString(
+                    csvPath,
+                    String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+            return true;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to update TA profile", e);
+        }
+    }
+
     public List<TaProfile> readAll() {
         ensureFileExists();
         try {
