@@ -44,7 +44,7 @@ public class TaRegistrationPanel extends JPanel {
                 service.register(request);
                 JOptionPane.showMessageDialog(this, "Registration completed.");
             } catch (IllegalArgumentException ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage());
+                JOptionPane.showMessageDialog(this, "Registration failed: " + ex.getMessage());
             }
         });
     }

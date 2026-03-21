@@ -19,10 +19,17 @@ public class CsvUserRepository {
     }
 
     public boolean existsByEmail(String email) {
+        if (email == null) {
+            return false;
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        if (normalizedEmail.isEmpty()) {
+            return false;
+        }
         List<String> lines = readLines();
         return lines.stream().skip(1).anyMatch(line -> {
             String[] parts = line.split(",", -1);
-            return parts.length > 1 && parts[1].equalsIgnoreCase(email);
+            return parts.length > 1 && parts[1].trim().equalsIgnoreCase(normalizedEmail);
         });
     }
 

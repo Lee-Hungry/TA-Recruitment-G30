@@ -24,4 +24,40 @@ class TaRegistrationServiceTest {
 
         assertEquals("EMAIL_ALREADY_EXISTS", ex.getMessage());
     }
+
+    @Test
+    void shouldRejectInvalidEmailFormat() throws Exception {
+        Path tempDir = Files.createTempDirectory("registration-email");
+        CsvUserRepository repository = new CsvUserRepository(tempDir.resolve("user_account.csv"));
+        TaRegistrationService service = new TaRegistrationService(repository);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.register(new TaRegistrationRequest("Alice", "alice-at-g30", "231222001", "password1")));
+
+        assertEquals("EMAIL_FORMAT_INVALID", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectShortPassword() throws Exception {
+        Path tempDir = Files.createTempDirectory("registration-password");
+        CsvUserRepository repository = new CsvUserRepository(tempDir.resolve("user_account.csv"));
+        TaRegistrationService service = new TaRegistrationService(repository);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.register(new TaRegistrationRequest("Alice", "alice@g30.local", "231222001", "short")));
+
+        assertEquals("PASSWORD_TOO_SHORT", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectInvalidStudentId() throws Exception {
+        Path tempDir = Files.createTempDirectory("registration-student-id");
+        CsvUserRepository repository = new CsvUserRepository(tempDir.resolve("user_account.csv"));
+        TaRegistrationService service = new TaRegistrationService(repository);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.register(new TaRegistrationRequest("Alice", "alice@g30.local", "A31222001", "password1")));
+
+        assertEquals("STUDENT_ID_FORMAT_INVALID", ex.getMessage());
+    }
 }

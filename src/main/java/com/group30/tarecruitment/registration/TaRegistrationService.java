@@ -4,7 +4,8 @@ import java.util.regex.Pattern;
 
 public class TaRegistrationService {
 
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final Pattern STUDENT_ID_PATTERN = Pattern.compile("^\\d{9}$");
     private final CsvUserRepository userRepository;
 
     public TaRegistrationService(CsvUserRepository userRepository) {
@@ -28,6 +29,9 @@ public class TaRegistrationService {
         }
         if (isBlank(request.studentId())) {
             throw new IllegalArgumentException("STUDENT_ID_REQUIRED");
+        }
+        if (!STUDENT_ID_PATTERN.matcher(request.studentId()).matches()) {
+            throw new IllegalArgumentException("STUDENT_ID_FORMAT_INVALID");
         }
         if (isBlank(request.password()) || request.password().length() < 8) {
             throw new IllegalArgumentException("PASSWORD_TOO_SHORT");
