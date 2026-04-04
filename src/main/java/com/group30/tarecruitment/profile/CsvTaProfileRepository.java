@@ -1,5 +1,7 @@
 package com.group30.tarecruitment.profile;
 
+import com.group30.tarecruitment.csv.CsvSupport;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,7 +12,7 @@ import java.util.Optional;
 
 public class CsvTaProfileRepository {
 
-    private static final String HEADER = "ta_profile_id,user_id,full_name,student_id,degree_programme,gpa,skills,availability,cv_file_path";
+    private static final String HEADER = "email,full_name,student_id,contact_email,degree_programme,gpa,skills,availability,updated_at";
     private final Path csvPath;
 
     public CsvTaProfileRepository(Path csvPath) {
@@ -18,104 +20,92 @@ public class CsvTaProfileRepository {
         ensureFileExists();
     }
 
-    public Optional<TaProfile> findByUserId(String userId) {
-        return readAll().stream().filter(profile -> profile.userId().equals(userId)).findFirst();
+    public Optional<TaProfile> findByEmail(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return readAll().stream()
+                .filter(profile -> profile.email().equalsIgnoreCase(normalizedEmail))
+                .findFirst();
     }
 
-    public void save(TaProfile profile) {
-        ensureFileExists();
-        String line = String.join(",",
-                profile.taProfileId(),
-                profile.userId(),
-                profile.fullName(),
-                profile.studentId(),
-                profile.degreeProgramme(),
-                profile.gpa(),
-                profile.skills(),
-                profile.availability(),
-                profile.cvFilePath());
-        try {
-            Files.writeString(csvPath, line + System.lineSeparator(), StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to save TA profile", e);
+    public void upsert(TaProfile profile) {
+        List<TaProfile> profiles = readAll();
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add(HEADER);
+
+        boolean replaced = false;
+        for (TaProfile existing : profiles) {
+            if (existing.email().equalsIgnoreCase(profile.email())) {
+                rewritten.add(toCsv(profile));
+                replaced = true;
+            } else {
+                rewritten.add(toCsv(existing));
+            }
         }
-    }
 
-    public boolean updateByUserId(TaProfile profile) {
-        ensureFileExists();
+        if (!replaced) {
+            rewritten.add(toCsv(profile));
+        }
+
         try {
-            List<String> lines = Files.readAllLines(csvPath);
-            if (lines.isEmpty()) {
-                return false;
-            }
-
-            boolean updated = false;
-            List<String> rewritten = new ArrayList<>();
-            rewritten.add(lines.get(0));
-
-            for (int i = 1; i < lines.size(); i++) {
-                String line = lines.get(i).trim();
-                if (line.isEmpty()) {
-                    continue;
-                }
-                String[] parts = line.split(",", -1);
-                if (parts.length < 9) {
-                    continue;
-                }
-                if (parts[1].equals(profile.userId())) {
-                    rewritten.add(String.join(",",
-                            profile.taProfileId(),
-                            profile.userId(),
-                            profile.fullName(),
-                            profile.studentId(),
-                            profile.degreeProgramme(),
-                            profile.gpa(),
-                            profile.skills(),
-                            profile.availability(),
-                            profile.cvFilePath()
-                    ));
-                    updated = true;
-                } else {
-                    rewritten.add(line);
-                }
-            }
-
-            if (!updated) {
-                return false;
-            }
-
             Files.writeString(
                     csvPath,
                     String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE
             );
-            return true;
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to update TA profile", e);
+            throw new IllegalStateException("Failed to write TA profile csv", e);
         }
     }
 
-    public List<TaProfile> readAll() {
+    private List<TaProfile> readAll() {
         ensureFileExists();
         try {
-            List<TaProfile> profiles = new ArrayList<>();
             List<String> lines = Files.readAllLines(csvPath);
+            List<TaProfile> profiles = new ArrayList<>();
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i).trim();
                 if (line.isEmpty()) {
                     continue;
                 }
-                String[] parts = line.split(",", -1);
-                if (parts.length < 9) {
+                List<String> parts = CsvSupport.parseRow(line);
+                if (parts.size() < 9) {
                     continue;
                 }
-                profiles.add(new TaProfile(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], parts[6], parts[7], parts[8]));
+                profiles.add(new TaProfile(
+                        parts.get(0),
+                        parts.get(1),
+                        parts.get(2),
+                        parts.get(3),
+                        parts.get(4),
+                        parts.get(5),
+                        parts.get(6),
+                        parts.get(7),
+                        parts.get(8)
+                ));
             }
             return profiles;
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to read profile csv", e);
+            throw new IllegalStateException("Failed to read TA profile csv", e);
         }
+    }
+
+    private String toCsv(TaProfile profile) {
+        return CsvSupport.joinRow(
+                profile.email(),
+                profile.fullName(),
+                profile.studentId(),
+                profile.contactEmail(),
+                profile.degreeProgramme(),
+                profile.gpa(),
+                profile.skills(),
+                profile.availability(),
+                profile.updatedAt()
+        );
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 
     private void ensureFileExists() {
@@ -127,7 +117,7 @@ public class CsvTaProfileRepository {
                 Files.writeString(csvPath, HEADER + System.lineSeparator(), StandardOpenOption.CREATE_NEW);
             }
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to init profile csv", e);
+            throw new IllegalStateException("Failed to init TA profile csv", e);
         }
     }
 }

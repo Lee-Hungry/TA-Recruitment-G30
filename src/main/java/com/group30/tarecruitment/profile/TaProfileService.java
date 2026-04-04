@@ -1,77 +1,77 @@
 package com.group30.tarecruitment.profile;
 
-import java.util.UUID;
-import java.util.regex.Pattern;
+import java.time.OffsetDateTime;
 
 public class TaProfileService {
 
-    private static final Pattern GPA_PATTERN = Pattern.compile("^(?:[0-3](?:\\.\\d{1,2})?|4(?:\\.0{1,2})?)$");
     private final CsvTaProfileRepository repository;
 
     public TaProfileService(CsvTaProfileRepository repository) {
         this.repository = repository;
     }
 
-    public TaProfile createFirstProfile(String userId, String fullName, String studentId, String degreeProgramme,
-                                        String gpa, String skills, String availability) {
-        validateBase(userId, fullName, studentId, gpa);
-        if (repository.findByUserId(userId).isPresent()) {
-            throw new IllegalArgumentException("PROFILE_ALREADY_EXISTS");
-        }
-
-        TaProfile profile = new TaProfile(
-                "profile-" + UUID.randomUUID(),
-                userId,
+    public TaProfile createInitialProfile(String fullName, String email, String studentId) {
+        return saveProfile(normalizeEmail(email), new TaProfileDraft(
                 fullName,
                 studentId,
-                degreeProgramme,
-                gpa,
-                skills,
-                availability,
+                normalizeEmail(email),
+                "",
+                "",
+                "",
                 ""
+        ));
+    }
+
+    public TaProfile saveProfile(String email, TaProfileDraft draft) {
+        String normalizedEmail = normalizeEmail(email);
+        validate(normalizedEmail, draft);
+        TaProfile profile = new TaProfile(
+                normalizedEmail,
+                draft.fullName().trim(),
+                draft.studentId().trim(),
+                draft.contactEmail().trim(),
+                draft.degreeProgramme().trim(),
+                draft.gpa().trim(),
+                draft.skills().trim(),
+                draft.availability().trim(),
+                OffsetDateTime.now().toString()
         );
-        repository.save(profile);
-        return profile;
+        repository.upsert(profile);
+        return repository.findByEmail(normalizedEmail).orElse(profile);
     }
 
-    public TaProfile loadByUserId(String userId) {
-        return repository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("PROFILE_NOT_FOUND"));
+    public TaProfile loadProfile(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        return repository.findByEmail(normalizedEmail).orElseGet(() -> new TaProfile(
+                normalizedEmail,
+                "",
+                "",
+                normalizedEmail,
+                "",
+                "",
+                "",
+                "",
+                ""
+        ));
     }
 
-    public TaProfile saveOrUpdate(String userId, String fullName, String studentId, String degreeProgramme,
-                                  String gpa, String skills, String availability) {
-        validateBase(userId, fullName, studentId, gpa);
-
-        return repository.findByUserId(userId)
-                .map(existing -> {
-                    if (!existing.studentId().equals(studentId)) {
-                        throw new IllegalArgumentException("STUDENT_ID_READ_ONLY");
-                    }
-                    TaProfile updated = new TaProfile(
-                            existing.taProfileId(),
-                            existing.userId(),
-                            fullName,
-                            existing.studentId(),
-                            degreeProgramme,
-                            gpa,
-                            skills,
-                            availability,
-                            existing.cvFilePath()
-                    );
-                    repository.updateByUserId(updated);
-                    return updated;
-                })
-                .orElseGet(() -> createFirstProfile(userId, fullName, studentId, degreeProgramme, gpa, skills, availability));
-    }
-
-    private void validateBase(String userId, String fullName, String studentId, String gpa) {
-        if (isBlank(userId) || isBlank(fullName) || isBlank(studentId)) {
-            throw new IllegalArgumentException("REQUIRED_FIELD_MISSING");
+    private void validate(String email, TaProfileDraft draft) {
+        if (email.isBlank()) {
+            throw new IllegalArgumentException("EMAIL_REQUIRED");
         }
-        if (isBlank(gpa) || !GPA_PATTERN.matcher(gpa).matches()) {
-            throw new IllegalArgumentException("GPA_FORMAT_INVALID");
+        if (isBlank(draft.fullName())) {
+            throw new IllegalArgumentException("FULL_NAME_REQUIRED");
         }
+        if (isBlank(draft.studentId())) {
+            throw new IllegalArgumentException("STUDENT_ID_REQUIRED");
+        }
+        if (isBlank(draft.contactEmail())) {
+            throw new IllegalArgumentException("CONTACT_EMAIL_REQUIRED");
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 
     private boolean isBlank(String value) {
