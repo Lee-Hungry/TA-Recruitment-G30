@@ -1,1 +1,2 @@
-ta_profile_id,user_id,full_name,student_id,degree_programme,gpa,skills,availability,cv_file_path
+email,full_name,student_id,contact_email,degree_programme,gpa,skills,availability,updated_at
+ta@g30.local,Alice Tan,231222001,ta@g30.local,MSc Software Engineering,3.82,"Java,JUnit,Communication",Weekdays after 2pm,2026-03-29T16:07:41.365899800+08:00
