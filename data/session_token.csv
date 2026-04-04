@@ -1,1 +1,1 @@
-session_id,user_id,issued_at,expired_at,revoked_at,client_ip
+session_id,user_id,issued_at,expired_at,revoked_at,client_ip7503ea8c-dc76-4b44-b164-8bae5659d2ee,ta-001,2026-03-29T16:06:11.067306100+08:00,,,127.0.0.1

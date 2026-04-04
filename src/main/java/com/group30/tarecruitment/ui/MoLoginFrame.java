@@ -1,5 +1,7 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
+import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
 
@@ -11,6 +13,8 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import java.awt.GridLayout;
+import java.nio.file.Path;
+import java.time.Clock;
 
 public class MoLoginFrame extends JFrame {
 
@@ -44,7 +48,17 @@ public class MoLoginFrame extends JFrame {
                 return;
             }
 
-            new MoDashboardFrame().setVisible(true);
+            new MoDashboardFrame(
+                    emailField.getText().trim(),
+                    result.sessionId(),
+                    loginService,
+                    new JobPostingService(
+                            new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                            Clock.systemDefaultZone()
+                    ),
+                    () -> {
+                    }
+            ).setVisible(true);
             dispose();
         });
 

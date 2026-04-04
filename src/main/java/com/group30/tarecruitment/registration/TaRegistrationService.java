@@ -1,5 +1,7 @@
 package com.group30.tarecruitment.registration;
 
+import com.group30.tarecruitment.profile.TaProfileService;
+
 import java.util.regex.Pattern;
 
 public class TaRegistrationService {
@@ -7,9 +9,15 @@ public class TaRegistrationService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final Pattern STUDENT_ID_PATTERN = Pattern.compile("^\\d{9}$");
     private final CsvUserRepository userRepository;
+    private final TaProfileService profileService;
 
     public TaRegistrationService(CsvUserRepository userRepository) {
+        this(userRepository, null);
+    }
+
+    public TaRegistrationService(CsvUserRepository userRepository, TaProfileService profileService) {
         this.userRepository = userRepository;
+        this.profileService = profileService;
     }
 
     public void register(TaRegistrationRequest request) {
@@ -18,6 +26,9 @@ public class TaRegistrationService {
             throw new IllegalArgumentException("EMAIL_ALREADY_EXISTS");
         }
         userRepository.saveTaAccount(request);
+        if (profileService != null) {
+            profileService.createInitialProfile(request.fullName(), request.email(), request.studentId());
+        }
     }
 
     private void validate(TaRegistrationRequest request) {
