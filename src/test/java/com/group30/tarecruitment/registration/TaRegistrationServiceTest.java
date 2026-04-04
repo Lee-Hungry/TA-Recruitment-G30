@@ -7,8 +7,31 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.group30.tarecruitment.profile.CsvTaProfileRepository;
+import com.group30.tarecruitment.profile.TaProfileService;
 
 class TaRegistrationServiceTest {
+
+    @Test
+    void shouldCreateInitialProfileWhenRegistrationSucceeds() throws Exception {
+        Path tempDir = Files.createTempDirectory("registration-profile");
+        Path userCsv = tempDir.resolve("user_account.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
+
+        TaRegistrationService service = new TaRegistrationService(
+                new CsvUserRepository(userCsv),
+                new TaProfileService(new CsvTaProfileRepository(profileCsv))
+        );
+
+        service.register(new TaRegistrationRequest("Alice Zhang", "alice@g30.local", "231222001", "password1"));
+
+        String csv = Files.readString(profileCsv);
+        assertTrue(csv.contains("alice@g30.local"));
+        assertTrue(csv.contains("Alice Zhang"));
+        assertTrue(csv.contains("231222001"));
+    }
 
     @Test
     void shouldRejectDuplicateEmail() throws Exception {

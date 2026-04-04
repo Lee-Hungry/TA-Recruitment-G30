@@ -1,7 +1,11 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
+import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.TaLoginResult;
 import com.group30.tarecruitment.login.TaLoginService;
+import com.group30.tarecruitment.profile.CsvTaProfileRepository;
+import com.group30.tarecruitment.profile.TaProfileService;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -13,6 +17,8 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import java.awt.GridLayout;
 import java.awt.Window;
+import java.nio.file.Path;
+import java.time.Clock;
 
 public class TaLoginPanel extends JPanel {
 
@@ -38,14 +44,21 @@ public class TaLoginPanel extends JPanel {
             );
             if (result.success()) {
                 Window currentWindow = SwingUtilities.getWindowAncestor(this);
-                TaDashboardFrame dashboardFrame = new TaDashboardFrame(result.sessionId(), loginService, () -> {
-                    JFrame loginFrame = new JFrame("TA Login");
-                    loginFrame.setSize(460, 220);
-                    loginFrame.setLocationRelativeTo(null);
-                    loginFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                    loginFrame.setContentPane(new TaLoginPanel(loginService));
-                    loginFrame.setVisible(true);
-                });
+                TaDashboardFrame dashboardFrame = new TaDashboardFrame(
+                        emailField.getText().trim(),
+                        result.sessionId(),
+                        loginService,
+                        new TaProfileService(new CsvTaProfileRepository(Path.of("data", "ta_profile.csv"))),
+                        new JobPostingService(new CsvJobPostingRepository(Path.of("data", "job_posting.csv")), Clock.systemDefaultZone()),
+                        () -> {
+                            JFrame loginFrame = new JFrame("TA Login");
+                            loginFrame.setSize(460, 220);
+                            loginFrame.setLocationRelativeTo(null);
+                            loginFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                            loginFrame.setContentPane(new TaLoginPanel(loginService));
+                            loginFrame.setVisible(true);
+                        }
+                );
                 dashboardFrame.setVisible(true);
                 if (currentWindow != null) {
                     currentWindow.dispose();
