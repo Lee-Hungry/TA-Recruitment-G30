@@ -352,7 +352,8 @@ public class TaDashboardFrame extends JFrame {
                     degreeField.getText(),
                     gpaField.getText(),
                     skillsArea.getText(),
-                    availabilityArea.getText()
+                    availabilityArea.getText(),
+                    ""
             ));
             refreshDashboardSummary();
             JOptionPane.showMessageDialog(this, "Profile saved.");

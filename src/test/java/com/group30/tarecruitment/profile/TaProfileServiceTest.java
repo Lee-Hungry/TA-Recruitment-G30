@@ -23,7 +23,8 @@ class TaProfileServiceTest {
                 "MSc Software Engineering",
                 "3.85",
                 "Java,Python,Communication",
-                "Weekdays after 2pm"
+                "Weekdays after 2pm",
+                ""
         ));
 
         TaProfile loaded = service.loadProfile("ta@g30.local");
@@ -46,7 +47,8 @@ class TaProfileServiceTest {
                 "MSc Software Engineering",
                 "3.80",
                 "Java",
-                "Monday"
+                "Monday",
+                ""
         ));
 
         TaProfile updated = service.saveProfile("ta@g30.local", new TaProfileDraft(
@@ -56,7 +58,8 @@ class TaProfileServiceTest {
                 "MSc Artificial Intelligence",
                 "3.92",
                 "Java,Python",
-                "Monday,Wednesday"
+                "Monday,Wednesday",
+                ""
         ));
 
         assertEquals("MSc Artificial Intelligence", updated.degreeProgramme());
