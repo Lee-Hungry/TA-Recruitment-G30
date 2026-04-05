@@ -15,6 +15,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -24,6 +25,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Component;
@@ -32,6 +34,7 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
 import java.nio.file.Path;
 import java.time.Clock;
 
@@ -50,6 +53,7 @@ public class TaDashboardFrame extends JFrame {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
     private final JLabel profileStatusValue = new JLabel();
+    private final JLabel cvStatusValue = new JLabel();
     private final JLabel openJobsValue = new JLabel();
     private final JTextField fullNameField = new JTextField();
     private final JTextField studentIdField = new JTextField();
@@ -58,6 +62,7 @@ public class TaDashboardFrame extends JFrame {
     private final JTextField gpaField = new JTextField();
     private final JTextArea skillsArea = new JTextArea(4, 20);
     private final JTextArea availabilityArea = new JTextArea(4, 20);
+    private final JLabel currentCvLabel = new JLabel("No CV uploaded");
     private final DefaultListModel<JobPosting> jobListModel = new DefaultListModel<>();
     private final JList<JobPosting> jobList = new JList<>(jobListModel);
     private final JLabel jobTitleLabel = new JLabel("Select a job");
@@ -65,6 +70,7 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea jobDescriptionArea = new JTextArea();
     private final JTextArea jobSkillArea = new JTextArea();
     private boolean returningToLogin;
+    private String selectedCvPath = "";
 
     public TaDashboardFrame(
             String email,
@@ -213,9 +219,10 @@ public class TaDashboardFrame extends JFrame {
     }
 
     private JPanel createHomeCard() {
-        JPanel card = new JPanel(new GridLayout(1, 2, 18, 18));
+        JPanel card = new JPanel(new GridLayout(1, 3, 18, 18));
         card.setOpaque(false);
         card.add(buildMetricCard("Profile Status", profileStatusValue));
+        card.add(buildMetricCard("CV Status", cvStatusValue));
         card.add(buildMetricCard("Open Jobs", openJobsValue));
         return card;
     }
@@ -261,6 +268,8 @@ public class TaDashboardFrame extends JFrame {
         details.add(createTextAreaBlock("Skills", skillsArea));
         details.add(UiTheme.verticalGap(14));
         details.add(createTextAreaBlock("Availability", availabilityArea));
+        details.add(UiTheme.verticalGap(14));
+        details.add(createCvCard());
 
         columns.add(basics);
         columns.add(details);
@@ -273,6 +282,28 @@ public class TaDashboardFrame extends JFrame {
         footer.add(saveButton);
         card.add(footer, BorderLayout.SOUTH);
         return card;
+    }
+
+    private JPanel createCvCard() {
+        JPanel cvCard = new JPanel(new BorderLayout(12, 12));
+        cvCard.setBackground(UiTheme.PANEL_BACKGROUND);
+        cvCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)
+        ));
+
+        JLabel title = new JLabel("CV Upload");
+        title.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        cvCard.add(title, BorderLayout.NORTH);
+        cvCard.add(currentCvLabel, BorderLayout.CENTER);
+
+        JButton uploadButton = UiTheme.secondaryButton("Upload / Replace CV");
+        uploadButton.addActionListener(e -> chooseAndUploadCv());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        footer.setOpaque(false);
+        footer.add(uploadButton);
+        cvCard.add(footer, BorderLayout.SOUTH);
+        return cvCard;
     }
 
     private JPanel createJobsCard() {
@@ -341,6 +372,8 @@ public class TaDashboardFrame extends JFrame {
         gpaField.setText(profile.gpa());
         skillsArea.setText(profile.skills());
         availabilityArea.setText(profile.availability());
+        selectedCvPath = profile.cvFilePath();
+        updateCvLabel();
     }
 
     private void saveProfile() {
@@ -353,12 +386,33 @@ public class TaDashboardFrame extends JFrame {
                     gpaField.getText(),
                     skillsArea.getText(),
                     availabilityArea.getText(),
-                    ""
+                    selectedCvPath
             ));
             refreshDashboardSummary();
             JOptionPane.showMessageDialog(this, "Profile saved.");
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, "Profile save failed: " + ex.getMessage());
+        }
+    }
+
+    private void chooseAndUploadCv() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Select CV File");
+        chooser.setFileFilter(new FileNameExtensionFilter("CV Files (.pdf, .txt)", "pdf", "txt"));
+        int choice = chooser.showOpenDialog(this);
+        if (choice != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File selectedFile = chooser.getSelectedFile();
+        try {
+            TaProfile updated = profileService.attachCv(email, selectedFile.getAbsolutePath());
+            selectedCvPath = updated.cvFilePath();
+            updateCvLabel();
+            refreshDashboardSummary();
+            JOptionPane.showMessageDialog(this, "CV uploaded successfully.");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "CV upload failed: " + ex.getMessage());
         }
     }
 
@@ -391,7 +445,21 @@ public class TaDashboardFrame extends JFrame {
     private void refreshDashboardSummary() {
         TaProfile profile = profileService.loadProfile(email);
         profileStatusValue.setText(profile.fullName().isBlank() ? "Incomplete" : "Ready");
+        cvStatusValue.setText(profile.cvFilePath().isBlank() ? "Not Uploaded" : "Uploaded");
         openJobsValue.setText(Integer.toString(jobPostingService.browseOpenJobs().size()));
+    }
+
+    private void updateCvLabel() {
+        currentCvLabel.setText(selectedCvPath.isBlank() ? "No CV uploaded" : extractFileName(selectedCvPath));
+    }
+
+    private String extractFileName(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String normalized = value.replace('\\', '/');
+        int slashIndex = normalized.lastIndexOf('/');
+        return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
     }
 
     private void handleLogout() {
