@@ -1,5 +1,7 @@
 package com.group30.tarecruitment;
 
+import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
+import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthService;
 import com.group30.tarecruitment.auth.repository.CsvSessionTokenRepository;
 import com.group30.tarecruitment.auth.repository.CsvUserAccountRepository;
@@ -28,6 +30,7 @@ public class AppLauncher {
             Path sessionCsv = Path.of("data", "session_token.csv");
             Path profileCsv = Path.of("data", "ta_profile.csv");
             Path jobCsv = Path.of("data", "job_posting.csv");
+            Path applicationCsv = Path.of("data", "job_application.csv");
 
             TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
             TaRegistrationService registrationService = new TaRegistrationService(
@@ -50,6 +53,11 @@ public class AppLauncher {
                     new CsvJobPostingRepository(jobCsv),
                     Clock.systemDefaultZone()
             );
+            JobApplicationService applicationService = new JobApplicationService(
+                    new CsvJobApplicationRepository(applicationCsv),
+                    new CsvJobPostingRepository(jobCsv),
+                    Clock.systemDefaultZone()
+            );
 
             LoginFrame frame = new LoginFrame(
                     authService,
@@ -57,7 +65,8 @@ public class AppLauncher {
                     taLoginService,
                     moLoginService,
                     profileService,
-                    jobPostingService
+                    jobPostingService,
+                    applicationService
             );
             frame.setVisible(true);
         });

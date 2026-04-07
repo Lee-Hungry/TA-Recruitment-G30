@@ -1,5 +1,7 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
+import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingService;
@@ -49,6 +51,7 @@ public class TaDashboardFrame extends JFrame {
     private final TaLoginService loginService;
     private final TaProfileService profileService;
     private final JobPostingService jobPostingService;
+    private final JobApplicationService applicationService;
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
@@ -69,6 +72,7 @@ public class TaDashboardFrame extends JFrame {
     private final JLabel jobMetaLabel = new JLabel("No job selected.");
     private final JTextArea jobDescriptionArea = new JTextArea();
     private final JTextArea jobSkillArea = new JTextArea();
+    private final JButton applyButton = UiTheme.primaryButton("Apply Now");
     private boolean returningToLogin;
     private String selectedCvPath = "";
 
@@ -78,6 +82,7 @@ public class TaDashboardFrame extends JFrame {
             TaLoginService loginService,
             TaProfileService profileService,
             JobPostingService jobPostingService,
+            JobApplicationService applicationService,
             Runnable showLoginFrame
     ) {
         this.email = email == null ? "" : email.trim().toLowerCase();
@@ -85,6 +90,7 @@ public class TaDashboardFrame extends JFrame {
         this.loginService = loginService;
         this.profileService = profileService;
         this.jobPostingService = jobPostingService;
+        this.applicationService = applicationService;
         this.showLoginFrame = showLoginFrame;
 
         setTitle("TA Dashboard");
@@ -136,6 +142,11 @@ public class TaDashboardFrame extends JFrame {
                 loginService,
                 new TaProfileService(new CsvTaProfileRepository(Path.of("data", "ta_profile.csv"))),
                 new JobPostingService(new CsvJobPostingRepository(Path.of("data", "job_posting.csv")), Clock.systemDefaultZone()),
+                new JobApplicationService(
+                        new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
+                        new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                        Clock.systemDefaultZone()
+                ),
                 showLoginFrame
         );
     }
@@ -323,9 +334,9 @@ public class TaDashboardFrame extends JFrame {
         header.setOpaque(false);
         jobTitleLabel.setFont(UiTheme.SECTION_FONT);
         header.add(jobTitleLabel, BorderLayout.WEST);
-        JButton disabledApply = UiTheme.secondaryButton("Apply in Sprint 2");
-        disabledApply.setEnabled(false);
-        header.add(disabledApply, BorderLayout.EAST);
+        applyButton.setEnabled(false);
+        applyButton.addActionListener(e -> applyForSelectedJob());
+        header.add(applyButton, BorderLayout.EAST);
         right.add(header, BorderLayout.NORTH);
 
         JPanel details = new JPanel(new GridLayout(1, 2, 12, 12));
@@ -434,12 +445,28 @@ public class TaDashboardFrame extends JFrame {
             jobMetaLabel.setText("No open jobs available.");
             jobDescriptionArea.setText("");
             jobSkillArea.setText("");
+            applyButton.setEnabled(false);
             return;
         }
         jobTitleLabel.setText(job.moduleCode() + ": " + job.title());
         jobMetaLabel.setText("Hours " + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline());
         jobDescriptionArea.setText(job.description());
         jobSkillArea.setText(job.requiredSkills());
+        applyButton.setEnabled(true);
+    }
+
+    private void applyForSelectedJob() {
+        JobPosting selectedJob = jobList.getSelectedValue();
+        if (selectedJob == null) {
+            JOptionPane.showMessageDialog(this, "Please select a job first.");
+            return;
+        }
+        try {
+            applicationService.submitApplication(email, selectedJob.jobId());
+            JOptionPane.showMessageDialog(this, "Application submitted successfully.");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Application failed: " + ex.getMessage());
+        }
     }
 
     private void refreshDashboardSummary() {

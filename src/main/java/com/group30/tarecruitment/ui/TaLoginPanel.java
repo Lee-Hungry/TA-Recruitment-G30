@@ -1,5 +1,7 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
+import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.TaLoginResult;
@@ -50,6 +52,11 @@ public class TaLoginPanel extends JPanel {
                         loginService,
                         new TaProfileService(new CsvTaProfileRepository(Path.of("data", "ta_profile.csv"))),
                         new JobPostingService(new CsvJobPostingRepository(Path.of("data", "job_posting.csv")), Clock.systemDefaultZone()),
+                        new JobApplicationService(
+                                new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
+                                new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                                Clock.systemDefaultZone()
+                        ),
                         () -> {
                             JFrame loginFrame = new JFrame("TA Login");
                             loginFrame.setSize(460, 220);
