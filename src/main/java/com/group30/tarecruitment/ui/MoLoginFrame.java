@@ -1,9 +1,12 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
+import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
+import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -54,6 +57,12 @@ public class MoLoginFrame extends JFrame {
                     loginService,
                     new JobPostingService(
                             new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                            Clock.systemDefaultZone()
+                    ),
+                    new JobApplicationService(
+                            new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
+                            new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                            new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
                             Clock.systemDefaultZone()
                     ),
                     () -> {

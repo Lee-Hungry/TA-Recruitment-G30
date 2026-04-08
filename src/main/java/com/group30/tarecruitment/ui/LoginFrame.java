@@ -225,6 +225,7 @@ public class LoginFrame extends JFrame {
                 result.sessionId(),
                 moLoginService,
                 jobPostingService,
+                applicationService,
                 this::showAgain
         ).setVisible(true);
     }
