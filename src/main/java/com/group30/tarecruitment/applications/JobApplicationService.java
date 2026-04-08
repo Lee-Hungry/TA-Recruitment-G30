@@ -2,10 +2,13 @@ package com.group30.tarecruitment.applications;
 
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
+import com.group30.tarecruitment.profile.CsvTaProfileRepository;
+import com.group30.tarecruitment.profile.TaProfile;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -15,15 +18,18 @@ public class JobApplicationService {
 
     private final CsvJobApplicationRepository applicationRepository;
     private final CsvJobPostingRepository jobRepository;
+    private final CsvTaProfileRepository profileRepository;
     private final Clock clock;
 
     public JobApplicationService(
             CsvJobApplicationRepository applicationRepository,
             CsvJobPostingRepository jobRepository,
+            CsvTaProfileRepository profileRepository,
             Clock clock
     ) {
         this.applicationRepository = applicationRepository;
         this.jobRepository = jobRepository;
+        this.profileRepository = profileRepository;
         this.clock = clock;
     }
 
@@ -83,6 +89,15 @@ public class JobApplicationService {
                 .toList();
     }
 
+    public List<MoApplicantView> listApplicantsForJob(String moEmail, String jobId) {
+        JobPosting posting = getOwnedJob(moEmail, jobId);
+        return applicationRepository.readAll().stream()
+                .filter(application -> application.jobId().equals(posting.jobId()))
+                .sorted(Comparator.comparing(JobApplication::appliedAt))
+                .map(application -> toMoApplicantView(posting, application))
+                .toList();
+    }
+
     private JobPosting getOpenJob(String jobId) {
         JobPosting posting = jobRepository.readAll().stream()
                 .filter(job -> job.jobId().equals(jobId))
@@ -95,6 +110,48 @@ public class JobApplicationService {
             throw new IllegalArgumentException("JOB_EXPIRED");
         }
         return posting;
+    }
+
+    private MoApplicantView toMoApplicantView(JobPosting posting, JobApplication application) {
+        TaProfile profile = profileRepository.findByEmail(application.taEmail()).orElseGet(() -> new TaProfile(
+                application.taEmail(),
+                application.taEmail(),
+                "",
+                application.taEmail(),
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+        ));
+
+        return new MoApplicantView(
+                application.applicationId(),
+                posting.jobId(),
+                posting.title(),
+                posting.moduleCode(),
+                profile.fullName(),
+                profile.studentId(),
+                application.taEmail(),
+                profile.degreeProgramme(),
+                profile.gpa(),
+                profile.skills(),
+                profile.availability(),
+                profile.cvFilePath(),
+                posting.hoursPerWeek(),
+                application.appliedAt(),
+                application.status()
+        );
+    }
+
+    private JobPosting getOwnedJob(String moEmail, String jobId) {
+        String normalizedEmail = normalizeEmail(moEmail);
+        return jobRepository.readAll().stream()
+                .filter(job -> job.jobId().equals(jobId))
+                .filter(job -> job.postedByEmail().equalsIgnoreCase(normalizedEmail))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("JOB_NOT_FOUND_FOR_MO"));
     }
 
     private String normalizeEmail(String email) {

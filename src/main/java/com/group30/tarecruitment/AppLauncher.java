@@ -56,6 +56,7 @@ public class AppLauncher {
             JobApplicationService applicationService = new JobApplicationService(
                     new CsvJobApplicationRepository(applicationCsv),
                     new CsvJobPostingRepository(jobCsv),
+                    new CsvTaProfileRepository(profileCsv),
                     Clock.systemDefaultZone()
             );
 
