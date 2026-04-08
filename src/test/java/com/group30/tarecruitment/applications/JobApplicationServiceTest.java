@@ -4,6 +4,9 @@ import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingDraft;
 import com.group30.tarecruitment.jobs.JobPostingService;
+import com.group30.tarecruitment.profile.CsvTaProfileRepository;
+import com.group30.tarecruitment.profile.TaProfileDraft;
+import com.group30.tarecruitment.profile.TaProfileService;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -25,6 +28,7 @@ class JobApplicationServiceTest {
     void shouldCreatePendingApplicationAndExposeItInTaStatusView() throws Exception {
         Path tempDir = Files.createTempDirectory("job-application-create");
         Path jobCsv = tempDir.resolve("job_posting.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
         Path applicationCsv = tempDir.resolve("job_application.csv");
 
         JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
@@ -41,6 +45,7 @@ class JobApplicationServiceTest {
         JobApplicationService service = new JobApplicationService(
                 new CsvJobApplicationRepository(applicationCsv),
                 new CsvJobPostingRepository(jobCsv),
+                new CsvTaProfileRepository(profileCsv),
                 fixedClock
         );
 
@@ -58,6 +63,7 @@ class JobApplicationServiceTest {
     void shouldRejectDuplicateApplicationsForSameJob() throws Exception {
         Path tempDir = Files.createTempDirectory("job-application-duplicate");
         Path jobCsv = tempDir.resolve("job_posting.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
         Path applicationCsv = tempDir.resolve("job_application.csv");
 
         JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
@@ -74,6 +80,7 @@ class JobApplicationServiceTest {
         JobApplicationService service = new JobApplicationService(
                 new CsvJobApplicationRepository(applicationCsv),
                 new CsvJobPostingRepository(jobCsv),
+                new CsvTaProfileRepository(profileCsv),
                 fixedClock
         );
         service.submitApplication("ta@g30.local", posting.jobId());
@@ -84,5 +91,52 @@ class JobApplicationServiceTest {
         );
 
         assertEquals("DUPLICATE_APPLICATION", error.getMessage());
+    }
+
+    @Test
+    void shouldReturnApplicantsForMoOwnedJobWithProfileDetails() throws Exception {
+        Path tempDir = Files.createTempDirectory("job-application-applicants");
+        Path jobCsv = tempDir.resolve("job_posting.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
+        Path applicationCsv = tempDir.resolve("job_application.csv");
+
+        JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
+        TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
+        JobPosting posting = jobPostingService.postJob(new JobPostingDraft(
+                "mo@g30.local",
+                "Software Engineering TA",
+                "EBU6304",
+                "Support labs and marking",
+                "Java,JUnit,Scrum",
+                10,
+                LocalDate.of(2026, 4, 15)
+        ));
+        profileService.saveProfile("ta@g30.local", new TaProfileDraft(
+                "Alice Zhang",
+                "231222001",
+                "alice@g30.local",
+                "MSc Software Engineering",
+                "3.82",
+                "Java,Communication",
+                "Weekdays after 2pm",
+                ""
+        ));
+        profileService.attachCv("ta@g30.local", "C:/Users/alice/Documents/alice_cv.pdf");
+
+        JobApplicationService service = new JobApplicationService(
+                new CsvJobApplicationRepository(applicationCsv),
+                new CsvJobPostingRepository(jobCsv),
+                new CsvTaProfileRepository(profileCsv),
+                fixedClock
+        );
+        service.submitApplication("ta@g30.local", posting.jobId());
+
+        List<MoApplicantView> applicants = service.listApplicantsForJob("mo@g30.local", posting.jobId());
+
+        assertEquals(1, applicants.size());
+        assertEquals("Alice Zhang", applicants.getFirst().fullName());
+        assertEquals("231222001", applicants.getFirst().studentId());
+        assertEquals("Java,Communication", applicants.getFirst().skills());
+        assertEquals("C:/Users/alice/Documents/alice_cv.pdf", applicants.getFirst().cvFilePath());
     }
 }
