@@ -57,6 +57,37 @@ public class CsvJobApplicationRepository {
         }
     }
 
+    public void replace(JobApplication updated) {
+        List<JobApplication> applications = readAll();
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add(HEADER);
+
+        boolean replaced = false;
+        for (JobApplication current : applications) {
+            if (current.applicationId().equals(updated.applicationId())) {
+                rewritten.add(toCsv(updated));
+                replaced = true;
+            } else {
+                rewritten.add(toCsv(current));
+            }
+        }
+
+        if (!replaced) {
+            rewritten.add(toCsv(updated));
+        }
+
+        try {
+            Files.writeString(
+                    csvPath,
+                    String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to rewrite job application csv", e);
+        }
+    }
+
     private String toCsv(JobApplication application) {
         return CsvSupport.joinRow(
                 application.applicationId(),

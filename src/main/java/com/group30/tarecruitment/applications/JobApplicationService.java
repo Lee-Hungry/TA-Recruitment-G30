@@ -98,6 +98,26 @@ public class JobApplicationService {
                 .toList();
     }
 
+    public JobApplication updateApplicationStatus(String moEmail, String applicationId, String nextStatus) {
+        String normalizedStatus = normalizeStatus(nextStatus);
+        if (!"ACCEPTED".equals(normalizedStatus) && !"REJECTED".equals(normalizedStatus)) {
+            throw new IllegalArgumentException("INVALID_APPLICATION_STATUS");
+        }
+
+        JobApplication current = applicationRepository.readAll().stream()
+                .filter(application -> application.applicationId().equals(applicationId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("APPLICATION_NOT_FOUND"));
+        JobPosting posting = getOwnedJob(moEmail, current.jobId());
+        if (posting.applicationDeadline().isBefore(OffsetDateTime.now(clock).toLocalDate())) {
+            throw new IllegalArgumentException("DECISION_DEADLINE_PASSED");
+        }
+
+        JobApplication updated = current.withStatus(normalizedStatus, OffsetDateTime.now(clock).toString());
+        applicationRepository.replace(updated);
+        return updated;
+    }
+
     private JobPosting getOpenJob(String jobId) {
         JobPosting posting = jobRepository.readAll().stream()
                 .filter(job -> job.jobId().equals(jobId))
@@ -156,5 +176,9 @@ public class JobApplicationService {
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private String normalizeStatus(String status) {
+        return status == null ? "" : status.trim().toUpperCase();
     }
 }

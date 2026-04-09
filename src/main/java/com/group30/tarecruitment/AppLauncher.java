@@ -28,6 +28,7 @@ public class AppLauncher {
         SwingUtilities.invokeLater(() -> {
             Path userCsv = Path.of("data", "user_account.csv");
             Path sessionCsv = Path.of("data", "session_token.csv");
+            Path moSessionCsv = Path.of("data", "mo_session.csv");
             Path profileCsv = Path.of("data", "ta_profile.csv");
             Path jobCsv = Path.of("data", "job_posting.csv");
             Path applicationCsv = Path.of("data", "job_application.csv");
@@ -43,7 +44,7 @@ public class AppLauncher {
             );
             MoLoginService moLoginService = new MoLoginService(
                     new CsvMoAccountRepository(userCsv),
-                    new CsvSessionRepository(sessionCsv)
+                    new CsvSessionRepository(moSessionCsv)
             );
             AuthService authService = new AuthService(
                     new CsvUserAccountRepository(userCsv),
