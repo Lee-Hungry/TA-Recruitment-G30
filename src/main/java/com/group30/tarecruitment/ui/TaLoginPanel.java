@@ -55,6 +55,7 @@ public class TaLoginPanel extends JPanel {
                         new JobApplicationService(
                                 new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
                                 new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                                new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
                                 Clock.systemDefaultZone()
                         ),
                         () -> {
