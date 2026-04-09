@@ -40,6 +40,9 @@ import java.awt.event.WindowEvent;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -86,6 +89,8 @@ public class MoDashboardFrame extends JFrame {
     private final JLabel applicantMetaLabel = new JLabel("No applicant selected.");
     private final JLabel applicantCvLabel = new JLabel("CV path: -");
     private final JTextArea applicantProfileArea = buildReadonlyTextArea();
+    private final JButton acceptButton = UiTheme.primaryButton("Accept");
+    private final JButton rejectButton = UiTheme.secondaryButton("Reject");
     private final List<MoApplicantView> currentApplicants = new ArrayList<>();
     private boolean returningToLogin;
 
@@ -147,6 +152,9 @@ public class MoDashboardFrame extends JFrame {
                 showSelectedApplicant(row >= 0 && row < currentApplicants.size() ? currentApplicants.get(row) : null);
             }
         });
+        acceptButton.addActionListener(e -> reviewSelectedApplicant("ACCEPTED"));
+        rejectButton.addActionListener(e -> reviewSelectedApplicant("REJECTED"));
+        setApplicantActionsEnabled(false);
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(UiTheme.APP_BACKGROUND);
@@ -164,7 +172,7 @@ public class MoDashboardFrame extends JFrame {
                 "",
                 new MoLoginService(
                         new CsvMoAccountRepository(Path.of("data", "user_account.csv")),
-                        new CsvSessionRepository(Path.of("data", "session_token.csv"))
+                        new CsvSessionRepository(Path.of("data", "mo_session.csv"))
                 ),
                 new JobPostingService(new CsvJobPostingRepository(Path.of("data", "job_posting.csv")), Clock.systemDefaultZone()),
                 new JobApplicationService(
@@ -250,7 +258,7 @@ public class MoDashboardFrame extends JFrame {
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
-        right.add(new JLabel("Notifications"));
+        right.add(new JLabel("Hiring Board"));
         right.add(new JLabel(moEmail.isBlank() ? "MO User" : moEmail));
         topBar.add(right, BorderLayout.EAST);
         return topBar;
@@ -355,6 +363,12 @@ public class MoDashboardFrame extends JFrame {
         detailBody.add(applicantCvLabel, BorderLayout.SOUTH);
         right.add(detailBody, BorderLayout.CENTER);
 
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        actions.setOpaque(false);
+        actions.add(rejectButton);
+        actions.add(acceptButton);
+        right.add(actions, BorderLayout.SOUTH);
+
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         splitPane.setResizeWeight(0.52);
         splitPane.setBorder(null);
@@ -458,7 +472,7 @@ public class MoDashboardFrame extends JFrame {
                     applicant.fullName(),
                     applicant.studentId(),
                     applicant.skills(),
-                    applicant.appliedAt(),
+                    formatTimestamp(applicant.appliedAt()),
                     applicant.status()
             });
         }
@@ -474,12 +488,13 @@ public class MoDashboardFrame extends JFrame {
             applicantNameLabel.setText("Select an applicant");
             applicantMetaLabel.setText("No applicant selected.");
             applicantCvLabel.setText("CV path: -");
-            applicantProfileArea.setText("Choose a posting and an applicant to review the full TA profile and uploaded CV path.");
+            applicantProfileArea.setText("Choose a posting and an applicant to review the full TA profile, uploaded CV path, and latest application status.");
+            setApplicantActionsEnabled(false);
             return;
         }
 
         applicantNameLabel.setText(applicant.fullName());
-        applicantMetaLabel.setText(applicant.moduleCode() + " | Applied " + applicant.appliedAt() + " | Status " + applicant.status());
+        applicantMetaLabel.setText(applicant.moduleCode() + " | Applied " + formatTimestamp(applicant.appliedAt()) + " | Status " + applicant.status());
         applicantCvLabel.setText("CV path: " + (applicant.cvFilePath().isBlank() ? "No CV uploaded" : applicant.cvFilePath()));
         applicantProfileArea.setText(
                 "Student ID: " + applicant.studentId() + System.lineSeparator()
@@ -494,10 +509,45 @@ public class MoDashboardFrame extends JFrame {
                         + "Availability" + System.lineSeparator()
                         + blankFallback(applicant.availability())
         );
+        setApplicantActionsEnabled(true);
     }
 
     private String blankFallback(String value) {
         return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private void reviewSelectedApplicant(String nextStatus) {
+        int selectedRow = applicantsTable.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= currentApplicants.size()) {
+            JOptionPane.showMessageDialog(this, "Please select an applicant first.");
+            return;
+        }
+
+        MoApplicantView applicant = currentApplicants.get(selectedRow);
+        try {
+            applicationService.updateApplicationStatus(moEmail, applicant.applicationId(), nextStatus);
+            refreshApplicantsForSelectedJob();
+            refreshMyPostings();
+            JOptionPane.showMessageDialog(this, "Application updated to " + nextStatus + ".");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Decision failed: " + ex.getMessage());
+        }
+    }
+
+    private void setApplicantActionsEnabled(boolean enabled) {
+        acceptButton.setEnabled(enabled);
+        rejectButton.setEnabled(enabled);
+    }
+
+    private String formatTimestamp(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            return OffsetDateTime.parse(value).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        } catch (DateTimeParseException ex) {
+            return value;
+        }
     }
 
     private void handleLogout() {
