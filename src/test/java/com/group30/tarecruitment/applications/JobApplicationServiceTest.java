@@ -32,6 +32,7 @@ class JobApplicationServiceTest {
         Path applicationCsv = tempDir.resolve("job_application.csv");
 
         JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
+        TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
         JobPosting posting = jobPostingService.postJob(new JobPostingDraft(
                 "mo@g30.local",
                 "Software Engineering TA",
@@ -40,6 +41,16 @@ class JobApplicationServiceTest {
                 "Java,JUnit,Scrum",
                 10,
                 LocalDate.of(2026, 4, 15)
+        ));
+        profileService.saveProfile("ta@g30.local", new TaProfileDraft(
+                "Alice Zhang",
+                "231222001",
+                "alice@g30.local",
+                "MSc Software Engineering",
+                "3.82",
+                "Java,Communication",
+                "Weekdays after 2pm",
+                ""
         ));
 
         JobApplicationService service = new JobApplicationService(
@@ -67,6 +78,7 @@ class JobApplicationServiceTest {
         Path applicationCsv = tempDir.resolve("job_application.csv");
 
         JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
+        TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
         JobPosting posting = jobPostingService.postJob(new JobPostingDraft(
                 "mo@g30.local",
                 "Database TA",
@@ -75,6 +87,16 @@ class JobApplicationServiceTest {
                 "SQL,PostgreSQL",
                 8,
                 LocalDate.of(2026, 4, 15)
+        ));
+        profileService.saveProfile("ta@g30.local", new TaProfileDraft(
+                "Alice Zhang",
+                "231222001",
+                "alice@g30.local",
+                "MSc Software Engineering",
+                "3.82",
+                "SQL",
+                "Weekdays after 2pm",
+                ""
         ));
 
         JobApplicationService service = new JobApplicationService(
@@ -95,7 +117,7 @@ class JobApplicationServiceTest {
 
     @Test
     void shouldReturnApplicantsForMoOwnedJobAndAllowDecisionBeforeDeadline() throws Exception {
-        Path tempDir = Files.createTempDirectory("job-application-applicants");
+        Path tempDir = Files.createTempDirectory("job-application-decision");
         Path jobCsv = tempDir.resolve("job_posting.csv");
         Path profileCsv = tempDir.resolve("ta_profile.csv");
         Path applicationCsv = tempDir.resolve("job_application.csv");

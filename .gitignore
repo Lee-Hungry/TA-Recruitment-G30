@@ -1,2 +1,8 @@
 /target/
 
+# Planning and local working docs
+/docs/superpowers/
+/backlog.md
+/guideline.md
+/prototype_images.md
+/prototype_media/

@@ -1,6 +1,7 @@
 package com.group30.tarecruitment.admin;
 
 import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
+import com.group30.tarecruitment.applications.JobApplication;
 import com.group30.tarecruitment.auth.AuthRole;
 import com.group30.tarecruitment.auth.UserAccount;
 import com.group30.tarecruitment.auth.repository.CsvUserAccountRepository;

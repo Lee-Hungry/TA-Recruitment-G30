@@ -57,7 +57,7 @@ public class JobApplicationService {
         return application;
     }
 
-    public java.util.List<TaApplicationSummary> listApplicationsForTa(String taEmail) {
+    public List<TaApplicationSummary> listApplicationsForTa(String taEmail) {
         String normalizedEmail = normalizeEmail(taEmail);
         Map<String, JobPosting> jobsById = jobRepository.readAll().stream()
                 .collect(Collectors.toMap(JobPosting::jobId, Function.identity(), (left, right) -> right));
@@ -118,20 +118,6 @@ public class JobApplicationService {
         return updated;
     }
 
-    private JobPosting getOpenJob(String jobId) {
-        JobPosting posting = jobRepository.readAll().stream()
-                .filter(job -> job.jobId().equals(jobId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("JOB_NOT_FOUND"));
-        if (!"OPEN".equalsIgnoreCase(posting.status())) {
-            throw new IllegalArgumentException("JOB_NOT_OPEN");
-        }
-        if (posting.applicationDeadline().isBefore(OffsetDateTime.now(clock).toLocalDate())) {
-            throw new IllegalArgumentException("JOB_EXPIRED");
-        }
-        return posting;
-    }
-
     private MoApplicantView toMoApplicantView(JobPosting posting, JobApplication application) {
         TaProfile profile = profileRepository.findByEmail(application.taEmail()).orElseGet(() -> new TaProfile(
                 application.taEmail(),
@@ -163,6 +149,20 @@ public class JobApplicationService {
                 application.appliedAt(),
                 application.status()
         );
+    }
+
+    private JobPosting getOpenJob(String jobId) {
+        JobPosting posting = jobRepository.readAll().stream()
+                .filter(job -> job.jobId().equals(jobId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("JOB_NOT_FOUND"));
+        if (!"OPEN".equalsIgnoreCase(posting.status())) {
+            throw new IllegalArgumentException("JOB_NOT_OPEN");
+        }
+        if (posting.applicationDeadline().isBefore(OffsetDateTime.now(clock).toLocalDate())) {
+            throw new IllegalArgumentException("JOB_EXPIRED");
+        }
+        return posting;
     }
 
     private JobPosting getOwnedJob(String moEmail, String jobId) {

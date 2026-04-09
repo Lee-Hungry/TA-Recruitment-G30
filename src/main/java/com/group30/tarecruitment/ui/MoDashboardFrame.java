@@ -64,16 +64,12 @@ public class MoDashboardFrame extends JFrame {
     private final DefaultTableModel postingsModel = new DefaultTableModel(
             new Object[]{"Job Title", "Module", "Deadline", "Hours", "Stage"},
             0
-    );
-    private final JLabel totalPostingsValue = new JLabel();
-    private final JLabel openPostingsValue = new JLabel();
-    private final JLabel pendingApplicantsValue = new JLabel();
-    private final JTextField jobTitleField = new JTextField();
-    private final JTextField moduleCodeField = new JTextField();
-    private final JTextField hoursField = new JTextField();
-    private final JTextField deadlineField = new JTextField();
-    private final JTextArea descriptionArea = new JTextArea(6, 20);
-    private final JTextArea skillsArea = new JTextArea(4, 20);
+    ) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
     private final DefaultTableModel applicantsModel = new DefaultTableModel(
             new Object[]{"Applicant", "Student ID", "Skills", "Applied", "Status"},
             0
@@ -84,6 +80,15 @@ public class MoDashboardFrame extends JFrame {
         }
     };
     private final JTable applicantsTable = new JTable(applicantsModel);
+    private final JLabel totalPostingsValue = new JLabel();
+    private final JLabel openPostingsValue = new JLabel();
+    private final JLabel pendingApplicantsValue = new JLabel();
+    private final JTextField jobTitleField = new JTextField();
+    private final JTextField moduleCodeField = new JTextField();
+    private final JTextField hoursField = new JTextField();
+    private final JTextField deadlineField = new JTextField();
+    private final JTextArea descriptionArea = new JTextArea(6, 20);
+    private final JTextArea skillsArea = new JTextArea(4, 20);
     private final JComboBox<JobPosting> applicantJobSelector = new JComboBox<>();
     private final JLabel applicantNameLabel = new JLabel("Select an applicant");
     private final JLabel applicantMetaLabel = new JLabel("No applicant selected.");
@@ -145,6 +150,7 @@ public class MoDashboardFrame extends JFrame {
             }
         });
         applicantJobSelector.addActionListener(e -> refreshApplicantsForSelectedJob());
+
         applicantsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         applicantsTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -152,6 +158,7 @@ public class MoDashboardFrame extends JFrame {
                 showSelectedApplicant(row >= 0 && row < currentApplicants.size() ? currentApplicants.get(row) : null);
             }
         });
+
         acceptButton.addActionListener(e -> reviewSelectedApplicant("ACCEPTED"));
         rejectButton.addActionListener(e -> reviewSelectedApplicant("REJECTED"));
         setApplicantActionsEnabled(false);
@@ -512,10 +519,6 @@ public class MoDashboardFrame extends JFrame {
         setApplicantActionsEnabled(true);
     }
 
-    private String blankFallback(String value) {
-        return value == null || value.isBlank() ? "-" : value;
-    }
-
     private void reviewSelectedApplicant(String nextStatus) {
         int selectedRow = applicantsTable.getSelectedRow();
         if (selectedRow < 0 || selectedRow >= currentApplicants.size()) {
@@ -537,6 +540,10 @@ public class MoDashboardFrame extends JFrame {
     private void setApplicantActionsEnabled(boolean enabled) {
         acceptButton.setEnabled(enabled);
         rejectButton.setEnabled(enabled);
+    }
+
+    private String blankFallback(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private String formatTimestamp(String value) {
