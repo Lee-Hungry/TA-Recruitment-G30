@@ -131,12 +131,17 @@ public class TaDashboardFrame extends JFrame {
 
         UiTheme.styleTextArea(skillsArea);
         UiTheme.styleTextArea(availabilityArea);
+        UiTheme.styleTextArea(applicationNotesArea);
+        applicationNotesArea.setEditable(false);
+        currentCvLabel.setFont(UiTheme.BODY_FONT);
+
         jobList.setCellRenderer(new JobRenderer());
         jobList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 showSelectedJob(jobList.getSelectedValue());
             }
         });
+
         applicationTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         applicationTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -158,6 +163,7 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleInput(contactEmailField);
         UiTheme.styleInput(degreeField);
         UiTheme.styleInput(gpaField);
+
         loadProfile();
         refreshJobList();
         refreshApplications();
@@ -344,6 +350,8 @@ public class TaDashboardFrame extends JFrame {
         JLabel title = new JLabel("CV Upload");
         title.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
         cvCard.add(title, BorderLayout.NORTH);
+
+        currentCvLabel.setText("No CV uploaded");
         cvCard.add(currentCvLabel, BorderLayout.CENTER);
 
         JButton uploadButton = UiTheme.secondaryButton("Upload / Replace CV");
@@ -565,7 +573,7 @@ public class TaDashboardFrame extends JFrame {
         if (application == null) {
             applicationTitleLabel.setText("Select an application");
             applicationMetaLabel.setText("No applications submitted yet.");
-            applicationNotesArea.setText("Apply for an open job to track its latest review status here.");
+            applicationNotesArea.setText("Apply for an open job to see its latest review status here.");
             return;
         }
 
@@ -580,10 +588,16 @@ public class TaDashboardFrame extends JFrame {
 
     private void refreshDashboardSummary() {
         TaProfile profile = profileService.loadProfile(email);
-        profileStatusValue.setText(profile.fullName().isBlank() ? "Incomplete" : "Ready");
+        profileStatusValue.setText(isProfileReady(profile) ? "Ready" : "Incomplete");
         cvStatusValue.setText(profile.cvFilePath().isBlank() ? "Not Uploaded" : "Uploaded");
         openJobsValue.setText(Integer.toString(jobPostingService.browseOpenJobs().size()));
         applicationCountValue.setText(Integer.toString(applicationService.listApplicationsForTa(email).size()));
+    }
+
+    private boolean isProfileReady(TaProfile profile) {
+        return !profile.fullName().isBlank()
+                && !profile.studentId().isBlank()
+                && !profile.contactEmail().isBlank();
     }
 
     private void updateCvLabel() {
@@ -608,6 +622,14 @@ public class TaDashboardFrame extends JFrame {
         } catch (DateTimeParseException ex) {
             return value;
         }
+    }
+
+    static String jobListItemText(JobPosting job) {
+        return "<html><b>" + job.title() + "</b><br/>"
+                + job.moduleCode() + " | Skills " + job.requiredSkills()
+                + "<br/>"
+                + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline()
+                + "</html>";
     }
 
     private void handleLogout() {
@@ -660,14 +682,6 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleTextArea(area);
         area.setEditable(false);
         return area;
-    }
-
-    static String jobListItemText(JobPosting job) {
-        return "<html><b>" + job.title() + "</b><br/>"
-                + job.moduleCode() + " | Skills " + job.requiredSkills()
-                + "<br/>"
-                + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline()
-                + "</html>";
     }
 
     private static final class JobRenderer extends DefaultListCellRenderer {
