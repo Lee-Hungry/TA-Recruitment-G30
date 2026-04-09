@@ -1,5 +1,7 @@
 package com.group30.tarecruitment;
 
+import com.group30.tarecruitment.admin.TaWorkloadService;
+import com.group30.tarecruitment.admin.WorkloadSettingsRepository;
 import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
 import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthService;
@@ -32,8 +34,14 @@ public class AppLauncher {
             Path profileCsv = Path.of("data", "ta_profile.csv");
             Path jobCsv = Path.of("data", "job_posting.csv");
             Path applicationCsv = Path.of("data", "job_application.csv");
+            Path settingsFile = Path.of("data", "settings.properties");
 
-            TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
+            CsvUserAccountRepository userAccountRepository = new CsvUserAccountRepository(userCsv);
+            CsvTaProfileRepository profileRepository = new CsvTaProfileRepository(profileCsv);
+            CsvJobPostingRepository jobRepository = new CsvJobPostingRepository(jobCsv);
+            CsvJobApplicationRepository applicationRepository = new CsvJobApplicationRepository(applicationCsv);
+
+            TaProfileService profileService = new TaProfileService(profileRepository);
             TaRegistrationService registrationService = new TaRegistrationService(
                     new CsvUserRepository(userCsv),
                     profileService
@@ -47,18 +55,25 @@ public class AppLauncher {
                     new CsvSessionRepository(moSessionCsv)
             );
             AuthService authService = new AuthService(
-                    new CsvUserAccountRepository(userCsv),
+                    userAccountRepository,
                     new CsvSessionTokenRepository(sessionCsv)
             );
             JobPostingService jobPostingService = new JobPostingService(
-                    new CsvJobPostingRepository(jobCsv),
+                    jobRepository,
                     Clock.systemDefaultZone()
             );
             JobApplicationService applicationService = new JobApplicationService(
-                    new CsvJobApplicationRepository(applicationCsv),
-                    new CsvJobPostingRepository(jobCsv),
-                    new CsvTaProfileRepository(profileCsv),
+                    applicationRepository,
+                    jobRepository,
+                    profileRepository,
                     Clock.systemDefaultZone()
+            );
+            TaWorkloadService workloadService = new TaWorkloadService(
+                    userAccountRepository,
+                    profileRepository,
+                    jobRepository,
+                    applicationRepository,
+                    new WorkloadSettingsRepository(settingsFile)
             );
 
             LoginFrame frame = new LoginFrame(
@@ -68,7 +83,8 @@ public class AppLauncher {
                     moLoginService,
                     profileService,
                     jobPostingService,
-                    applicationService
+                    applicationService,
+                    workloadService
             );
             frame.setVisible(true);
         });

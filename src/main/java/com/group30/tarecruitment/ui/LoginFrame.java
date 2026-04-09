@@ -1,5 +1,6 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.admin.TaWorkloadService;
 import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthResult;
 import com.group30.tarecruitment.auth.AuthRole;
@@ -31,6 +32,8 @@ import java.awt.GridLayout;
 
 public class LoginFrame extends JFrame {
 
+    private static final Dimension LOGIN_CARD_SIZE = new Dimension(430, 520);
+
     private final AuthService authService;
     private final TaRegistrationService registrationService;
     private final TaLoginService taLoginService;
@@ -38,6 +41,7 @@ public class LoginFrame extends JFrame {
     private final TaProfileService profileService;
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
+    private final TaWorkloadService workloadService;
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JComboBox<AuthRole> roleBox = new JComboBox<>(AuthRole.values());
@@ -49,7 +53,8 @@ public class LoginFrame extends JFrame {
             MoLoginService moLoginService,
             TaProfileService profileService,
             JobPostingService jobPostingService,
-            JobApplicationService applicationService
+            JobApplicationService applicationService,
+            TaWorkloadService workloadService
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
@@ -58,6 +63,7 @@ public class LoginFrame extends JFrame {
         this.profileService = profileService;
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
+        this.workloadService = workloadService;
 
         setTitle("TA Recruitment Login");
         setSize(1180, 720);
@@ -110,7 +116,7 @@ public class LoginFrame extends JFrame {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBackground(UiTheme.PANEL_BACKGROUND);
         card.setBorder(UiTheme.cardBorder());
-        card.setPreferredSize(new Dimension(430, 0));
+        card.setPreferredSize(loginCardPreferredSize());
 
         JLabel title = new JLabel("Log In");
         title.setFont(UiTheme.TITLE_FONT);
@@ -153,6 +159,10 @@ public class LoginFrame extends JFrame {
         center.add(card);
         wrapper.add(center, BorderLayout.CENTER);
         return wrapper;
+    }
+
+    static Dimension loginCardPreferredSize() {
+        return LOGIN_CARD_SIZE;
     }
 
     private JPanel createFieldBlock(String labelText, JComponent field) {
@@ -238,7 +248,7 @@ public class LoginFrame extends JFrame {
         }
 
         setVisible(false);
-        new AdminDashboardFrame(email, this::showAgain).setVisible(true);
+        new AdminDashboardFrame(email, workloadService, this::showAgain).setVisible(true);
     }
 
     private void openRegistrationWindow() {
