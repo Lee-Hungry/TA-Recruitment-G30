@@ -1,5 +1,6 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthResult;
 import com.group30.tarecruitment.auth.AuthRole;
 import com.group30.tarecruitment.auth.AuthService;
@@ -36,6 +37,7 @@ public class LoginFrame extends JFrame {
     private final MoLoginService moLoginService;
     private final TaProfileService profileService;
     private final JobPostingService jobPostingService;
+    private final JobApplicationService applicationService;
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JComboBox<AuthRole> roleBox = new JComboBox<>(AuthRole.values());
@@ -46,7 +48,8 @@ public class LoginFrame extends JFrame {
             TaLoginService taLoginService,
             MoLoginService moLoginService,
             TaProfileService profileService,
-            JobPostingService jobPostingService
+            JobPostingService jobPostingService,
+            JobApplicationService applicationService
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
@@ -54,6 +57,7 @@ public class LoginFrame extends JFrame {
         this.moLoginService = moLoginService;
         this.profileService = profileService;
         this.jobPostingService = jobPostingService;
+        this.applicationService = applicationService;
 
         setTitle("TA Recruitment Login");
         setSize(1180, 720);
@@ -199,6 +203,7 @@ public class LoginFrame extends JFrame {
                 taLoginService,
                 profileService,
                 jobPostingService,
+                applicationService,
                 this::showAgain
         ).setVisible(true);
     }
