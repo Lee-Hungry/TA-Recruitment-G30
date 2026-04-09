@@ -18,6 +18,7 @@ public class TaProfileService {
                 "",
                 "",
                 "",
+                "",
                 ""
         ));
     }
@@ -34,10 +35,29 @@ public class TaProfileService {
                 draft.gpa().trim(),
                 draft.skills().trim(),
                 draft.availability().trim(),
+                normalizeCvPath(draft.cvFilePath()),
                 OffsetDateTime.now().toString()
         );
         repository.upsert(profile);
         return repository.findByEmail(normalizedEmail).orElse(profile);
+    }
+
+    public TaProfile attachCv(String email, String cvFilePath) {
+        if (isBlank(cvFilePath)) {
+            throw new IllegalArgumentException("CV_FILE_REQUIRED");
+        }
+
+        TaProfile current = loadProfile(email);
+        return saveProfile(email, new TaProfileDraft(
+                current.fullName(),
+                current.studentId(),
+                current.contactEmail(),
+                current.degreeProgramme(),
+                current.gpa(),
+                current.skills(),
+                current.availability(),
+                cvFilePath
+        ));
     }
 
     public TaProfile loadProfile(String email) {
@@ -47,6 +67,7 @@ public class TaProfileService {
                 "",
                 "",
                 normalizedEmail,
+                "",
                 "",
                 "",
                 "",
@@ -68,13 +89,25 @@ public class TaProfileService {
         if (isBlank(draft.contactEmail())) {
             throw new IllegalArgumentException("CONTACT_EMAIL_REQUIRED");
         }
+        if (!isBlank(draft.cvFilePath()) && !isAllowedCvType(draft.cvFilePath())) {
+            throw new IllegalArgumentException("CV_FILE_TYPE_INVALID");
+        }
     }
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase();
     }
 
+    private String normalizeCvPath(String cvFilePath) {
+        return cvFilePath == null ? "" : cvFilePath.trim();
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private boolean isAllowedCvType(String cvFilePath) {
+        String normalizedPath = cvFilePath.trim().toLowerCase();
+        return normalizedPath.endsWith(".pdf") || normalizedPath.endsWith(".txt");
     }
 }

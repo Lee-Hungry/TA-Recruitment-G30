@@ -7,6 +7,7 @@ public record TaProfileDraft(
         String degreeProgramme,
         String gpa,
         String skills,
-        String availability
+        String availability,
+        String cvFilePath
 ) {
 }

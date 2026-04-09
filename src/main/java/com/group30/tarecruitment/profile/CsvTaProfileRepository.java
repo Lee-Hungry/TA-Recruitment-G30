@@ -12,7 +12,7 @@ import java.util.Optional;
 
 public class CsvTaProfileRepository {
 
-    private static final String HEADER = "email,full_name,student_id,contact_email,degree_programme,gpa,skills,availability,updated_at";
+    private static final String HEADER = "email,full_name,student_id,contact_email,degree_programme,gpa,skills,availability,cv_file_path,updated_at";
     private final Path csvPath;
 
     public CsvTaProfileRepository(Path csvPath) {
@@ -58,7 +58,7 @@ public class CsvTaProfileRepository {
         }
     }
 
-    private List<TaProfile> readAll() {
+    public List<TaProfile> readAll() {
         ensureFileExists();
         try {
             List<String> lines = Files.readAllLines(csvPath);
@@ -72,6 +72,8 @@ public class CsvTaProfileRepository {
                 if (parts.size() < 9) {
                     continue;
                 }
+                String cvFilePath = parts.size() >= 10 ? parts.get(8) : "";
+                String updatedAt = parts.size() >= 10 ? parts.get(9) : parts.get(8);
                 profiles.add(new TaProfile(
                         parts.get(0),
                         parts.get(1),
@@ -81,7 +83,8 @@ public class CsvTaProfileRepository {
                         parts.get(5),
                         parts.get(6),
                         parts.get(7),
-                        parts.get(8)
+                        cvFilePath,
+                        updatedAt
                 ));
             }
             return profiles;
@@ -100,6 +103,7 @@ public class CsvTaProfileRepository {
                 profile.gpa(),
                 profile.skills(),
                 profile.availability(),
+                profile.cvFilePath(),
                 profile.updatedAt()
         );
     }

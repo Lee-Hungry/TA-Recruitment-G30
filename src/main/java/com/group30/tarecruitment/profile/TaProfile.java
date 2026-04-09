@@ -9,6 +9,7 @@ public record TaProfile(
         String gpa,
         String skills,
         String availability,
+        String cvFilePath,
         String updatedAt
 ) {
 }
