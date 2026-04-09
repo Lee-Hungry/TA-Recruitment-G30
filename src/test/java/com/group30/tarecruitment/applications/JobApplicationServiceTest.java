@@ -94,7 +94,7 @@ class JobApplicationServiceTest {
     }
 
     @Test
-    void shouldReturnApplicantsForMoOwnedJobWithProfileDetails() throws Exception {
+    void shouldReturnApplicantsForMoOwnedJobAndAllowDecisionBeforeDeadline() throws Exception {
         Path tempDir = Files.createTempDirectory("job-application-applicants");
         Path jobCsv = tempDir.resolve("job_posting.csv");
         Path profileCsv = tempDir.resolve("ta_profile.csv");
@@ -129,14 +129,17 @@ class JobApplicationServiceTest {
                 new CsvTaProfileRepository(profileCsv),
                 fixedClock
         );
-        service.submitApplication("ta@g30.local", posting.jobId());
+        JobApplication application = service.submitApplication("ta@g30.local", posting.jobId());
 
         List<MoApplicantView> applicants = service.listApplicantsForJob("mo@g30.local", posting.jobId());
+        JobApplication reviewed = service.updateApplicationStatus("mo@g30.local", application.applicationId(), "ACCEPTED");
 
         assertEquals(1, applicants.size());
         assertEquals("Alice Zhang", applicants.getFirst().fullName());
         assertEquals("231222001", applicants.getFirst().studentId());
         assertEquals("Java,Communication", applicants.getFirst().skills());
         assertEquals("C:/Users/alice/Documents/alice_cv.pdf", applicants.getFirst().cvFilePath());
+        assertEquals("ACCEPTED", reviewed.status());
+        assertEquals("ACCEPTED", service.listApplicationsForTa("ta@g30.local").getFirst().status());
     }
 }
