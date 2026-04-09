@@ -2,6 +2,7 @@ package com.group30.tarecruitment.ui;
 
 import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
 import com.group30.tarecruitment.applications.JobApplicationService;
+import com.group30.tarecruitment.applications.TaApplicationSummary;
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingService;
@@ -25,9 +26,12 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Component;
@@ -39,12 +43,18 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class TaDashboardFrame extends JFrame {
 
     private static final String CARD_HOME = "HOME";
     private static final String CARD_PROFILE = "PROFILE";
     private static final String CARD_JOBS = "JOBS";
+    private static final String CARD_APPLICATIONS = "APPLICATIONS";
 
     private final String email;
     private final String sessionId;
@@ -58,6 +68,7 @@ public class TaDashboardFrame extends JFrame {
     private final JLabel profileStatusValue = new JLabel();
     private final JLabel cvStatusValue = new JLabel();
     private final JLabel openJobsValue = new JLabel();
+    private final JLabel applicationCountValue = new JLabel();
     private final JTextField fullNameField = new JTextField();
     private final JTextField studentIdField = new JTextField();
     private final JTextField contactEmailField = new JTextField();
@@ -70,9 +81,23 @@ public class TaDashboardFrame extends JFrame {
     private final JList<JobPosting> jobList = new JList<>(jobListModel);
     private final JLabel jobTitleLabel = new JLabel("Select a job");
     private final JLabel jobMetaLabel = new JLabel("No job selected.");
-    private final JTextArea jobDescriptionArea = new JTextArea();
-    private final JTextArea jobSkillArea = new JTextArea();
+    private final JTextArea jobDescriptionArea = buildReadonlyTextArea();
+    private final JTextArea jobSkillArea = buildReadonlyTextArea();
     private final JButton applyButton = UiTheme.primaryButton("Apply Now");
+    private final DefaultTableModel applicationTableModel = new DefaultTableModel(
+            new Object[]{"Job Title", "Module", "Applied", "Status"},
+            0
+    ) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    private final JTable applicationTable = new JTable(applicationTableModel);
+    private final JLabel applicationTitleLabel = new JLabel("Select an application");
+    private final JLabel applicationMetaLabel = new JLabel("No application selected.");
+    private final JTextArea applicationNotesArea = buildReadonlyTextArea();
+    private final List<TaApplicationSummary> currentApplications = new ArrayList<>();
     private boolean returningToLogin;
     private String selectedCvPath = "";
 
@@ -106,13 +131,19 @@ public class TaDashboardFrame extends JFrame {
 
         UiTheme.styleTextArea(skillsArea);
         UiTheme.styleTextArea(availabilityArea);
-        UiTheme.styleTextArea(jobDescriptionArea);
-        UiTheme.styleTextArea(jobSkillArea);
-
         jobList.setCellRenderer(new JobRenderer());
         jobList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 showSelectedJob(jobList.getSelectedValue());
+            }
+        });
+        applicationTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        applicationTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int selectedRow = applicationTable.getSelectedRow();
+                showSelectedApplication(selectedRow >= 0 && selectedRow < currentApplications.size()
+                        ? currentApplications.get(selectedRow)
+                        : null);
             }
         });
 
@@ -127,11 +158,9 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleInput(contactEmailField);
         UiTheme.styleInput(degreeField);
         UiTheme.styleInput(gpaField);
-        jobDescriptionArea.setEditable(false);
-        jobSkillArea.setEditable(false);
-
         loadProfile();
         refreshJobList();
+        refreshApplications();
         refreshDashboardSummary();
     }
 
@@ -168,7 +197,10 @@ public class TaDashboardFrame extends JFrame {
         sidebar.add(Box.createVerticalStrut(16));
 
         JButton homeButton = UiTheme.navButton("Dashboard");
-        homeButton.addActionListener(e -> cardLayout.show(contentPanel, CARD_HOME));
+        homeButton.addActionListener(e -> {
+            refreshDashboardSummary();
+            cardLayout.show(contentPanel, CARD_HOME);
+        });
         sidebar.add(homeButton);
 
         JButton profileButton = UiTheme.navButton("Profile");
@@ -186,11 +218,14 @@ public class TaDashboardFrame extends JFrame {
         sidebar.add(jobsButton);
 
         JButton applicationsButton = UiTheme.navButton("My Applications");
-        applicationsButton.addActionListener(e -> JOptionPane.showMessageDialog(this, "Applications arrive in Sprint 2."));
+        applicationsButton.addActionListener(e -> {
+            refreshApplications();
+            cardLayout.show(contentPanel, CARD_APPLICATIONS);
+        });
         sidebar.add(applicationsButton);
 
         JButton messagesButton = UiTheme.navButton("Messages");
-        messagesButton.addActionListener(e -> JOptionPane.showMessageDialog(this, "Messages arrive in Sprint 2."));
+        messagesButton.addActionListener(e -> JOptionPane.showMessageDialog(this, "Messaging is planned for a later sprint."));
         sidebar.add(messagesButton);
 
         sidebar.add(Box.createVerticalGlue());
@@ -210,6 +245,7 @@ public class TaDashboardFrame extends JFrame {
         contentPanel.add(createHomeCard(), CARD_HOME);
         contentPanel.add(createProfileCard(), CARD_PROFILE);
         contentPanel.add(createJobsCard(), CARD_JOBS);
+        contentPanel.add(createApplicationsCard(), CARD_APPLICATIONS);
         panel.add(contentPanel, BorderLayout.CENTER);
         return panel;
     }
@@ -223,18 +259,19 @@ public class TaDashboardFrame extends JFrame {
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
-        right.add(new JLabel("Notifications"));
+        right.add(new JLabel("Sprint 2 Ready"));
         right.add(new JLabel(email.isBlank() ? "TA User" : email));
         topBar.add(right, BorderLayout.EAST);
         return topBar;
     }
 
     private JPanel createHomeCard() {
-        JPanel card = new JPanel(new GridLayout(1, 3, 18, 18));
+        JPanel card = new JPanel(new GridLayout(2, 2, 18, 18));
         card.setOpaque(false);
         card.add(buildMetricCard("Profile Status", profileStatusValue));
         card.add(buildMetricCard("CV Status", cvStatusValue));
         card.add(buildMetricCard("Open Jobs", openJobsValue));
+        card.add(buildMetricCard("Applications", applicationCountValue));
         return card;
     }
 
@@ -374,6 +411,37 @@ public class TaDashboardFrame extends JFrame {
         return wrapper;
     }
 
+    private JPanel createApplicationsCard() {
+        JPanel left = new JPanel(new BorderLayout(12, 12));
+        left.setBackground(UiTheme.PANEL_BACKGROUND);
+        left.setBorder(UiTheme.cardBorder());
+        JLabel leftTitle = new JLabel("My Applications");
+        leftTitle.setFont(UiTheme.SECTION_FONT);
+        left.add(leftTitle, BorderLayout.NORTH);
+        left.add(new JScrollPane(applicationTable), BorderLayout.CENTER);
+
+        JPanel right = new JPanel(new BorderLayout(12, 12));
+        right.setBackground(UiTheme.PANEL_BACKGROUND);
+        right.setBorder(UiTheme.cardBorder());
+        applicationTitleLabel.setFont(UiTheme.SECTION_FONT);
+        right.add(applicationTitleLabel, BorderLayout.NORTH);
+
+        JPanel details = new JPanel(new BorderLayout(8, 8));
+        details.setOpaque(false);
+        details.add(applicationMetaLabel, BorderLayout.NORTH);
+        details.add(new JScrollPane(applicationNotesArea), BorderLayout.CENTER);
+        right.add(details, BorderLayout.CENTER);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
+        splitPane.setResizeWeight(0.52);
+        splitPane.setBorder(null);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(splitPane, BorderLayout.CENTER);
+        return wrapper;
+    }
+
     private void loadProfile() {
         TaProfile profile = profileService.loadProfile(email);
         fullNameField.setText(profile.fullName());
@@ -437,6 +505,7 @@ public class TaDashboardFrame extends JFrame {
         } else {
             showSelectedJob(null);
         }
+        refreshDashboardSummary();
     }
 
     private void showSelectedJob(JobPosting job) {
@@ -463,10 +532,49 @@ public class TaDashboardFrame extends JFrame {
         }
         try {
             applicationService.submitApplication(email, selectedJob.jobId());
+            refreshApplications();
+            refreshDashboardSummary();
+            cardLayout.show(contentPanel, CARD_APPLICATIONS);
             JOptionPane.showMessageDialog(this, "Application submitted successfully.");
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, "Application failed: " + ex.getMessage());
         }
+    }
+
+    private void refreshApplications() {
+        currentApplications.clear();
+        currentApplications.addAll(applicationService.listApplicationsForTa(email));
+        applicationTableModel.setRowCount(0);
+        for (TaApplicationSummary application : currentApplications) {
+            applicationTableModel.addRow(new Object[]{
+                    application.jobTitle(),
+                    application.moduleCode(),
+                    formatTimestamp(application.appliedAt()),
+                    application.status()
+            });
+        }
+        if (!currentApplications.isEmpty()) {
+            applicationTable.setRowSelectionInterval(0, 0);
+        } else {
+            showSelectedApplication(null);
+        }
+    }
+
+    private void showSelectedApplication(TaApplicationSummary application) {
+        if (application == null) {
+            applicationTitleLabel.setText("Select an application");
+            applicationMetaLabel.setText("No applications submitted yet.");
+            applicationNotesArea.setText("Apply for an open job to track its latest review status here.");
+            return;
+        }
+
+        applicationTitleLabel.setText(application.moduleCode() + ": " + application.jobTitle());
+        applicationMetaLabel.setText("Applied " + formatTimestamp(application.appliedAt()) + " | Status " + application.status());
+        applicationNotesArea.setText(switch (application.status()) {
+            case "ACCEPTED" -> "Your application has been accepted by the module organiser. The assigned weekly hours will now appear in the admin workload view.";
+            case "REJECTED" -> "This application was not selected. You can continue applying to other open TA roles.";
+            default -> "This application is still pending review. Check back here for the latest MO decision.";
+        });
     }
 
     private void refreshDashboardSummary() {
@@ -474,6 +582,7 @@ public class TaDashboardFrame extends JFrame {
         profileStatusValue.setText(profile.fullName().isBlank() ? "Incomplete" : "Ready");
         cvStatusValue.setText(profile.cvFilePath().isBlank() ? "Not Uploaded" : "Uploaded");
         openJobsValue.setText(Integer.toString(jobPostingService.browseOpenJobs().size()));
+        applicationCountValue.setText(Integer.toString(applicationService.listApplicationsForTa(email).size()));
     }
 
     private void updateCvLabel() {
@@ -487,6 +596,17 @@ public class TaDashboardFrame extends JFrame {
         String normalized = value.replace('\\', '/');
         int slashIndex = normalized.lastIndexOf('/');
         return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
+    }
+
+    private String formatTimestamp(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            return OffsetDateTime.parse(value).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        } catch (DateTimeParseException ex) {
+            return value;
+        }
     }
 
     private void handleLogout() {
@@ -534,6 +654,21 @@ public class TaDashboardFrame extends JFrame {
         return block;
     }
 
+    private JTextArea buildReadonlyTextArea() {
+        JTextArea area = new JTextArea();
+        UiTheme.styleTextArea(area);
+        area.setEditable(false);
+        return area;
+    }
+
+    static String jobListItemText(JobPosting job) {
+        return "<html><b>" + job.title() + "</b><br/>"
+                + job.moduleCode() + " | Skills " + job.requiredSkills()
+                + "<br/>"
+                + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline()
+                + "</html>";
+    }
+
     private static final class JobRenderer extends DefaultListCellRenderer {
         @Override
         public Component getListCellRendererComponent(
@@ -545,9 +680,7 @@ public class TaDashboardFrame extends JFrame {
         ) {
             JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
             if (value instanceof JobPosting job) {
-                label.setText("<html><b>" + job.title() + "</b><br/>"
-                        + job.moduleCode() + " | " + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline()
-                        + "</html>");
+                label.setText(jobListItemText(job));
                 label.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
             }
             return label;
