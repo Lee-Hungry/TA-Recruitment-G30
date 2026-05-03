@@ -441,12 +441,18 @@ public class MoDashboardFrame extends JFrame {
 
     private void savePosting() {
         try {
-            jobPostingService.postJob(buildDraftFromForm());
+            JobPostingDraft draft = buildDraftFromForm();
+            if (editingJobId.isBlank()) {
+                jobPostingService.postJob(draft);
+                JOptionPane.showMessageDialog(this, "Job posted successfully.");
+            } else {
+                jobPostingService.updatePosting(moEmail, editingJobId, draft);
+                JOptionPane.showMessageDialog(this, "Job updated successfully.");
+            }
             clearPostingForm();
             refreshMyPostings();
             refreshApplicantJobOptions();
             cardLayout.show(contentPanel, CARD_POSTINGS);
-            JOptionPane.showMessageDialog(this, "Job posted successfully.");
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Posting failed: " + ex.getMessage());
         }
@@ -480,6 +486,7 @@ public class MoDashboardFrame extends JFrame {
     }
 
     private void clearPostingForm() {
+        editingJobId = "";
         jobTypeBox.setSelectedItem("TA");
         jobTitleField.setText("");
         moduleCodeField.setText("");
