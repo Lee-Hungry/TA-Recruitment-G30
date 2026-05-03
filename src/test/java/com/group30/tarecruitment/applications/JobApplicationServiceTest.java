@@ -19,6 +19,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JobApplicationServiceTest {
 
@@ -163,5 +164,97 @@ class JobApplicationServiceTest {
         assertEquals("C:/Users/alice/Documents/alice_cv.pdf", applicants.getFirst().cvFilePath());
         assertEquals("ACCEPTED", reviewed.status());
         assertEquals("ACCEPTED", service.listApplicationsForTa("ta@g30.local").getFirst().status());
+    }
+
+    @Test
+    void shouldAllowTaToWithdrawPendingApplicationAndApplyAgain() throws Exception {
+        Path tempDir = Files.createTempDirectory("job-application-withdraw");
+        Path jobCsv = tempDir.resolve("job_posting.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
+        Path applicationCsv = tempDir.resolve("job_application.csv");
+
+        JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
+        TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
+        JobPosting posting = jobPostingService.postJob(new JobPostingDraft(
+                "mo@g30.local",
+                "Database TA",
+                "EBU6201",
+                "Support SQL workshops",
+                "SQL,Teaching",
+                8,
+                LocalDate.of(2026, 4, 15)
+        ));
+        profileService.saveProfile("ta@g30.local", new TaProfileDraft(
+                "Alice Zhang",
+                "231222001",
+                "alice@g30.local",
+                "MSc Software Engineering",
+                "3.82",
+                "SQL",
+                "Weekdays after 2pm",
+                ""
+        ));
+
+        JobApplicationService service = new JobApplicationService(
+                new CsvJobApplicationRepository(applicationCsv),
+                new CsvJobPostingRepository(jobCsv),
+                new CsvTaProfileRepository(profileCsv),
+                fixedClock
+        );
+        String firstApplicationId = service.submitApplication("ta@g30.local", posting.jobId()).applicationId();
+
+        JobApplication withdrawn = service.withdrawApplication("ta@g30.local", firstApplicationId);
+        JobApplication reapplied = service.submitApplication("ta@g30.local", posting.jobId());
+
+        assertEquals("WITHDRAWN", withdrawn.status());
+        assertTrue(service.listApplicantsForJob("mo@g30.local", posting.jobId()).stream()
+                .noneMatch(applicant -> applicant.applicationId().equals(firstApplicationId)));
+        assertEquals("PENDING", reapplied.status());
+    }
+
+    @Test
+    void shouldRejectWithdrawalAfterDecision() throws Exception {
+        Path tempDir = Files.createTempDirectory("job-application-withdraw-blocked");
+        Path jobCsv = tempDir.resolve("job_posting.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
+        Path applicationCsv = tempDir.resolve("job_application.csv");
+
+        JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
+        TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
+        JobPosting posting = jobPostingService.postJob(new JobPostingDraft(
+                "mo@g30.local",
+                "Software Engineering TA",
+                "EBU6304",
+                "Support labs and marking",
+                "Java,JUnit,Scrum",
+                10,
+                LocalDate.of(2026, 4, 15)
+        ));
+        profileService.saveProfile("ta@g30.local", new TaProfileDraft(
+                "Alice Zhang",
+                "231222001",
+                "alice@g30.local",
+                "MSc Software Engineering",
+                "3.82",
+                "Java,Communication",
+                "Weekdays after 2pm",
+                ""
+        ));
+
+        JobApplicationService service = new JobApplicationService(
+                new CsvJobApplicationRepository(applicationCsv),
+                new CsvJobPostingRepository(jobCsv),
+                new CsvTaProfileRepository(profileCsv),
+                fixedClock
+        );
+        String applicationId = service.submitApplication("ta@g30.local", posting.jobId()).applicationId();
+        service.updateApplicationStatus("mo@g30.local", applicationId, "REJECTED");
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.withdrawApplication("ta@g30.local", applicationId)
+        );
+
+        assertEquals("APPLICATION_WITHDRAW_NOT_ALLOWED", error.getMessage());
     }
 }

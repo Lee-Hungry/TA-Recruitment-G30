@@ -12,4 +12,8 @@ public record JobApplication(
     public JobApplication withStatus(String nextStatus, String nextUpdatedAt) {
         return new JobApplication(applicationId, jobId, taEmail, nextStatus, appliedAt, nextUpdatedAt);
     }
+
+    public boolean isWithdrawn() {
+        return "WITHDRAWN".equalsIgnoreCase(status);
+    }
 }
