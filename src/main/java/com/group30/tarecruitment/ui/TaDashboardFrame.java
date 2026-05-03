@@ -456,7 +456,7 @@ public class TaDashboardFrame extends JFrame {
 
         JPanel skillCard = new JPanel(new BorderLayout(8, 8));
         skillCard.setOpaque(false);
-        JLabel skillTitle = new JLabel("Required Skills");
+        JLabel skillTitle = new JLabel("Required Skills / Notes");
         skillTitle.setFont(UiTheme.SECTION_FONT);
         skillCard.add(skillTitle, BorderLayout.NORTH);
         skillCard.add(new JScrollPane(jobSkillArea), BorderLayout.CENTER);
@@ -560,16 +560,76 @@ public class TaDashboardFrame extends JFrame {
     }
 
     private void refreshJobList() {
+        String previousSelection = jobList.getSelectedValue() == null ? "" : jobList.getSelectedValue().jobId();
         jobListModel.clear();
-        for (JobPosting posting : jobPostingService.browseOpenJobs()) {
+
+        List<JobPosting> results = jobPostingService.browseOpenJobs(
+                jobSearchField.getText(),
+                selectedFilterValue(skillFilterBox),
+                selectedFilterValue(moduleFilterBox)
+        );
+        for (JobPosting posting : results) {
             jobListModel.addElement(posting);
         }
-        if (!jobListModel.isEmpty()) {
-            jobList.setSelectedIndex(0);
+
+        if (!results.isEmpty()) {
+            int selectedIndex = findJobIndex(previousSelection);
+            jobList.setSelectedIndex(selectedIndex >= 0 ? selectedIndex : 0);
+            jobResultHintLabel.setText(results.size() + " open job(s) found.");
         } else {
             showSelectedJob(null);
+            jobResultHintLabel.setText(hasActiveFilters()
+                    ? "No jobs match the current search and filters."
+                    : "No open jobs are available right now.");
         }
         refreshDashboardSummary();
+    }
+
+    private void refreshJobFilters() {
+        updatingJobFilters = true;
+        String selectedModule = selectedFilterValue(moduleFilterBox);
+        String selectedSkill = selectedFilterValue(skillFilterBox);
+
+        populateFilterBox(moduleFilterBox, jobPostingService.listOpenJobModules(), selectedModule);
+        populateFilterBox(skillFilterBox, jobPostingService.listOpenJobSkills(), selectedSkill);
+        updatingJobFilters = false;
+    }
+
+    private void populateFilterBox(JComboBox<String> comboBox, List<String> values, String selection) {
+        comboBox.removeAllItems();
+        comboBox.addItem(FILTER_ALL);
+        for (String value : values) {
+            comboBox.addItem(value);
+        }
+        if (selection != null && !selection.isBlank()) {
+            comboBox.setSelectedItem(selection);
+        } else {
+            comboBox.setSelectedItem(FILTER_ALL);
+        }
+    }
+
+    private int findJobIndex(String jobId) {
+        for (int i = 0; i < jobListModel.size(); i++) {
+            if (jobListModel.get(i).jobId().equals(jobId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean hasActiveFilters() {
+        return !jobSearchField.getText().trim().isBlank()
+                || !selectedFilterValue(moduleFilterBox).isBlank()
+                || !selectedFilterValue(skillFilterBox).isBlank();
+    }
+
+    private String selectedFilterValue(JComboBox<String> comboBox) {
+        Object selected = comboBox.getSelectedItem();
+        if (selected == null) {
+            return "";
+        }
+        String value = selected.toString().trim();
+        return FILTER_ALL.equalsIgnoreCase(value) ? "" : value;
     }
 
     private void showSelectedJob(JobPosting job) {
@@ -582,10 +642,39 @@ public class TaDashboardFrame extends JFrame {
             return;
         }
         jobTitleLabel.setText(job.moduleCode() + ": " + job.title());
-        jobMetaLabel.setText("Hours " + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline());
-        jobDescriptionArea.setText(job.description());
-        jobSkillArea.setText(job.requiredSkills());
+        jobMetaLabel.setText(buildJobMeta(job));
+        jobDescriptionArea.setText(buildJobDescription(job));
+        jobSkillArea.setText(buildSkillNotes(job));
         applyButton.setEnabled(true);
+    }
+
+    private String buildJobMeta(JobPosting job) {
+        String typeLabel = job.isInvigilation() ? "Invigilation" : "TA";
+        return typeLabel + " | " + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline();
+    }
+
+    private String buildJobDescription(JobPosting job) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(job.description());
+        builder.append(System.lineSeparator()).append(System.lineSeparator());
+        if (job.isInvigilation()) {
+            builder.append("Exam Date: ").append(blankFallback(job.examDate() == null ? "" : job.examDate().toString())).append(System.lineSeparator());
+            builder.append("Exam Time: ").append(blankFallback(job.examTime())).append(System.lineSeparator());
+            builder.append("Location: ").append(blankFallback(job.location())).append(System.lineSeparator());
+            builder.append("Invigilators Needed: ").append(job.invigilatorsNeeded());
+        } else {
+            builder.append("Module Code: ").append(job.moduleCode());
+        }
+        return builder.toString();
+    }
+
+    private String buildSkillNotes(JobPosting job) {
+        String skills = blankFallback(job.requiredSkills());
+        if (job.isInvigilation()) {
+            return "Required Skills: " + skills + System.lineSeparator() + System.lineSeparator()
+                    + "This is an invigilation opportunity. Application review follows the same workflow as standard TA jobs.";
+        }
+        return skills;
     }
 
     private void applyForSelectedJob() {
@@ -680,11 +769,25 @@ public class TaDashboardFrame extends JFrame {
     }
 
     static String jobListItemText(JobPosting job) {
-        return "<html><b>" + job.title() + "</b><br/>"
-                + job.moduleCode() + " | Skills " + job.requiredSkills()
-                + "<br/>"
-                + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline()
-                + "</html>";
+        String typeLabel = job.isInvigilation() ? "Invigilation" : "TA";
+        StringBuilder builder = new StringBuilder("<html><b>")
+                .append(job.title())
+                .append("</b><br/>")
+                .append(job.moduleCode())
+                .append(" | ")
+                .append(typeLabel);
+        if (!job.requiredSkills().isBlank()) {
+            builder.append(" | Skills ").append(job.requiredSkills());
+        }
+        builder.append("<br/>")
+                .append(job.hoursPerWeek())
+                .append(" hrs/week | Deadline ")
+                .append(job.applicationDeadline());
+        if (job.isInvigilation() && job.examDate() != null) {
+            builder.append("<br/>Exam ").append(job.examDate()).append(" @ ").append(blankStatic(job.location()));
+        }
+        builder.append("</html>");
+        return builder.toString();
     }
 
     private void handleLogout() {
@@ -737,6 +840,29 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleTextArea(area);
         area.setEditable(false);
         return area;
+    }
+
+    private void bindLiveRefresh(JTextField field, Runnable action) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                action.run();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                action.run();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                action.run();
+            }
+        });
+    }
+
+    private static String blankStatic(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private static final class JobRenderer extends DefaultListCellRenderer {
