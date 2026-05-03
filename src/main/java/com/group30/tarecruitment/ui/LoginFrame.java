@@ -1,5 +1,6 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.admin.AdminUserAccountService;
 import com.group30.tarecruitment.admin.TaWorkloadService;
 import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthResult;
@@ -42,6 +43,7 @@ public class LoginFrame extends JFrame {
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
     private final TaWorkloadService workloadService;
+    private final AdminUserAccountService userAccountService;
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JComboBox<AuthRole> roleBox = new JComboBox<>(AuthRole.values());
@@ -54,7 +56,8 @@ public class LoginFrame extends JFrame {
             TaProfileService profileService,
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
-            TaWorkloadService workloadService
+            TaWorkloadService workloadService,
+            AdminUserAccountService userAccountService
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
@@ -64,6 +67,7 @@ public class LoginFrame extends JFrame {
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
         this.workloadService = workloadService;
+        this.userAccountService = userAccountService;
 
         setTitle("TA Recruitment Login");
         setSize(1180, 720);
@@ -248,7 +252,7 @@ public class LoginFrame extends JFrame {
         }
 
         setVisible(false);
-        new AdminDashboardFrame(email, workloadService, this::showAgain).setVisible(true);
+        new AdminDashboardFrame(email, workloadService, userAccountService, jobPostingService, this::showAgain).setVisible(true);
     }
 
     private void openRegistrationWindow() {
