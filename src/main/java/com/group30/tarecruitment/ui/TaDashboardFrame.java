@@ -106,6 +106,7 @@ public class TaDashboardFrame extends JFrame {
     private final JLabel applicationTitleLabel = new JLabel("Select an application");
     private final JLabel applicationMetaLabel = new JLabel("No application selected.");
     private final JTextArea applicationNotesArea = buildReadonlyTextArea();
+    private final JButton withdrawButton = UiTheme.secondaryButton("Withdraw Application");
     private final List<TaApplicationSummary> currentApplications = new ArrayList<>();
     private boolean returningToLogin;
     private boolean updatingJobFilters;
@@ -227,6 +228,8 @@ public class TaDashboardFrame extends JFrame {
             refreshJobList();
         });
         applyButton.addActionListener(e -> applyForSelectedJob());
+        withdrawButton.addActionListener(e -> withdrawSelectedApplication());
+        withdrawButton.setEnabled(false);
     }
 
     private JPanel createSidebar() {
@@ -496,8 +499,13 @@ public class TaDashboardFrame extends JFrame {
         details.add(new JScrollPane(applicationNotesArea), BorderLayout.CENTER);
         right.add(details, BorderLayout.CENTER);
 
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        actions.setOpaque(false);
+        actions.add(withdrawButton);
+        right.add(actions, BorderLayout.SOUTH);
+
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
-        splitPane.setResizeWeight(0.52);
+        splitPane.setResizeWeight(0.54);
         splitPane.setBorder(null);
 
         JPanel wrapper = new JPanel(new BorderLayout());
@@ -695,6 +703,7 @@ public class TaDashboardFrame extends JFrame {
     }
 
     private void refreshApplications() {
+        String selectedApplicationId = selectedApplicationId();
         currentApplications.clear();
         currentApplications.addAll(applicationService.listApplicationsForTa(email));
         applicationTableModel.setRowCount(0);
@@ -707,10 +716,28 @@ public class TaDashboardFrame extends JFrame {
             });
         }
         if (!currentApplications.isEmpty()) {
-            applicationTable.setRowSelectionInterval(0, 0);
+            int selectedRow = findApplicationIndex(selectedApplicationId);
+            applicationTable.setRowSelectionInterval(selectedRow >= 0 ? selectedRow : 0, selectedRow >= 0 ? selectedRow : 0);
         } else {
             showSelectedApplication(null);
         }
+    }
+
+    private String selectedApplicationId() {
+        int selectedRow = applicationTable.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= currentApplications.size()) {
+            return "";
+        }
+        return currentApplications.get(selectedRow).applicationId();
+    }
+
+    private int findApplicationIndex(String applicationId) {
+        for (int i = 0; i < currentApplications.size(); i++) {
+            if (currentApplications.get(i).applicationId().equals(applicationId)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void showSelectedApplication(TaApplicationSummary application) {
@@ -718,6 +745,7 @@ public class TaDashboardFrame extends JFrame {
             applicationTitleLabel.setText("Select an application");
             applicationMetaLabel.setText("No applications submitted yet.");
             applicationNotesArea.setText("Apply for an open job to see its latest review status here.");
+            withdrawButton.setEnabled(false);
             return;
         }
 
@@ -726,8 +754,40 @@ public class TaDashboardFrame extends JFrame {
         applicationNotesArea.setText(switch (application.status()) {
             case "ACCEPTED" -> "Your application has been accepted by the module organiser. The assigned weekly hours will now appear in the admin workload view.";
             case "REJECTED" -> "This application was not selected. You can continue applying to other open TA roles.";
-            default -> "This application is still pending review. Check back here for the latest MO decision.";
+            case "WITHDRAWN" -> "You withdrew this application before a decision was made.";
+            default -> "This application is still pending review. You can withdraw it before the module organiser records a decision.";
         });
+        withdrawButton.setEnabled("PENDING".equalsIgnoreCase(application.status()));
+    }
+
+    private void withdrawSelectedApplication() {
+        int selectedRow = applicationTable.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= currentApplications.size()) {
+            JOptionPane.showMessageDialog(this, "Please select a pending application first.");
+            return;
+        }
+        TaApplicationSummary application = currentApplications.get(selectedRow);
+        if (!"PENDING".equalsIgnoreCase(application.status())) {
+            JOptionPane.showMessageDialog(this, "Only pending applications can be withdrawn.");
+            return;
+        }
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Withdraw this application?",
+                "Confirm Withdrawal",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            applicationService.withdrawApplication(email, application.applicationId());
+            refreshApplications();
+            refreshDashboardSummary();
+            JOptionPane.showMessageDialog(this, "Application withdrawn.");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Withdrawal failed: " + ex.getMessage());
+        }
     }
 
     private void refreshDashboardSummary() {
@@ -755,6 +815,10 @@ public class TaDashboardFrame extends JFrame {
         String normalized = value.replace('\\', '/');
         int slashIndex = normalized.lastIndexOf('/');
         return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
+    }
+
+    private String blankFallback(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private String formatTimestamp(String value) {
