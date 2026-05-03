@@ -18,6 +18,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -30,6 +31,8 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
@@ -55,6 +58,7 @@ public class TaDashboardFrame extends JFrame {
     private static final String CARD_PROFILE = "PROFILE";
     private static final String CARD_JOBS = "JOBS";
     private static final String CARD_APPLICATIONS = "APPLICATIONS";
+    private static final String FILTER_ALL = "All";
 
     private final String email;
     private final String sessionId;
@@ -77,8 +81,13 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea skillsArea = new JTextArea(4, 20);
     private final JTextArea availabilityArea = new JTextArea(4, 20);
     private final JLabel currentCvLabel = new JLabel("No CV uploaded");
+    private final JTextField jobSearchField = new JTextField();
+    private final JComboBox<String> moduleFilterBox = new JComboBox<>();
+    private final JComboBox<String> skillFilterBox = new JComboBox<>();
+    private final JButton clearFiltersButton = UiTheme.secondaryButton("Clear Filters");
     private final DefaultListModel<JobPosting> jobListModel = new DefaultListModel<>();
     private final JList<JobPosting> jobList = new JList<>(jobListModel);
+    private final JLabel jobResultHintLabel = new JLabel("Browse open jobs.");
     private final JLabel jobTitleLabel = new JLabel("Select a job");
     private final JLabel jobMetaLabel = new JLabel("No job selected.");
     private final JTextArea jobDescriptionArea = buildReadonlyTextArea();
@@ -99,6 +108,7 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea applicationNotesArea = buildReadonlyTextArea();
     private final List<TaApplicationSummary> currentApplications = new ArrayList<>();
     private boolean returningToLogin;
+    private boolean updatingJobFilters;
     private String selectedCvPath = "";
 
     public TaDashboardFrame(
@@ -129,28 +139,8 @@ public class TaDashboardFrame extends JFrame {
             }
         });
 
-        UiTheme.styleTextArea(skillsArea);
-        UiTheme.styleTextArea(availabilityArea);
-        UiTheme.styleTextArea(applicationNotesArea);
-        applicationNotesArea.setEditable(false);
-        currentCvLabel.setFont(UiTheme.BODY_FONT);
-
-        jobList.setCellRenderer(new JobRenderer());
-        jobList.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                showSelectedJob(jobList.getSelectedValue());
-            }
-        });
-
-        applicationTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        applicationTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                int selectedRow = applicationTable.getSelectedRow();
-                showSelectedApplication(selectedRow >= 0 && selectedRow < currentApplications.size()
-                        ? currentApplications.get(selectedRow)
-                        : null);
-            }
-        });
+        styleFields();
+        installInteractions();
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(UiTheme.APP_BACKGROUND);
@@ -158,13 +148,8 @@ public class TaDashboardFrame extends JFrame {
         root.add(createMainArea(), BorderLayout.CENTER);
         setContentPane(root);
 
-        UiTheme.styleInput(fullNameField);
-        UiTheme.styleInput(studentIdField);
-        UiTheme.styleInput(contactEmailField);
-        UiTheme.styleInput(degreeField);
-        UiTheme.styleInput(gpaField);
-
         loadProfile();
+        refreshJobFilters();
         refreshJobList();
         refreshApplications();
         refreshDashboardSummary();
@@ -185,6 +170,63 @@ public class TaDashboardFrame extends JFrame {
                 ),
                 showLoginFrame
         );
+    }
+
+    private void styleFields() {
+        UiTheme.styleTextArea(skillsArea);
+        UiTheme.styleTextArea(availabilityArea);
+        UiTheme.styleTextArea(applicationNotesArea);
+        applicationNotesArea.setEditable(false);
+        currentCvLabel.setFont(UiTheme.BODY_FONT);
+
+        UiTheme.styleInput(fullNameField);
+        UiTheme.styleInput(studentIdField);
+        UiTheme.styleInput(contactEmailField);
+        UiTheme.styleInput(degreeField);
+        UiTheme.styleInput(gpaField);
+        UiTheme.styleInput(jobSearchField);
+        UiTheme.styleInput(moduleFilterBox);
+        UiTheme.styleInput(skillFilterBox);
+    }
+
+    private void installInteractions() {
+        jobList.setCellRenderer(new JobRenderer());
+        jobList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                showSelectedJob(jobList.getSelectedValue());
+            }
+        });
+
+        applicationTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        applicationTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int selectedRow = applicationTable.getSelectedRow();
+                showSelectedApplication(selectedRow >= 0 && selectedRow < currentApplications.size()
+                        ? currentApplications.get(selectedRow)
+                        : null);
+            }
+        });
+
+        bindLiveRefresh(jobSearchField, this::refreshJobList);
+        moduleFilterBox.addActionListener(e -> {
+            if (!updatingJobFilters) {
+                refreshJobList();
+            }
+        });
+        skillFilterBox.addActionListener(e -> {
+            if (!updatingJobFilters) {
+                refreshJobList();
+            }
+        });
+        clearFiltersButton.addActionListener(e -> {
+            updatingJobFilters = true;
+            jobSearchField.setText("");
+            moduleFilterBox.setSelectedItem(FILTER_ALL);
+            skillFilterBox.setSelectedItem(FILTER_ALL);
+            updatingJobFilters = false;
+            refreshJobList();
+        });
+        applyButton.addActionListener(e -> applyForSelectedJob());
     }
 
     private JPanel createSidebar() {
@@ -219,6 +261,7 @@ public class TaDashboardFrame extends JFrame {
 
         JButton jobsButton = UiTheme.navButton("Find Jobs");
         jobsButton.addActionListener(e -> {
+            refreshJobFilters();
             refreshJobList();
             cardLayout.show(contentPanel, CARD_JOBS);
         });
@@ -260,14 +303,24 @@ public class TaDashboardFrame extends JFrame {
     private JPanel createTopBar() {
         JPanel topBar = new JPanel(new BorderLayout(12, 12));
         topBar.setBackground(UiTheme.APP_BACKGROUND);
-        JTextField searchField = new JTextField("Search jobs, skills...");
-        UiTheme.styleInput(searchField);
-        topBar.add(searchField, BorderLayout.CENTER);
+
+        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        filters.setOpaque(false);
+
+        jobSearchField.setPreferredSize(new Dimension(280, UiTheme.FIELD_HEIGHT));
+        moduleFilterBox.setPreferredSize(new Dimension(160, UiTheme.FIELD_HEIGHT));
+        skillFilterBox.setPreferredSize(new Dimension(170, UiTheme.FIELD_HEIGHT));
+
+        filters.add(jobSearchField);
+        filters.add(moduleFilterBox);
+        filters.add(skillFilterBox);
+        filters.add(clearFiltersButton);
+        topBar.add(filters, BorderLayout.WEST);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
-        right.add(new JLabel("Sprint 2 Ready"));
-        right.add(new JLabel(email.isBlank() ? "TA User" : email));
+        right.add(new JLabel("TA User"));
+        right.add(new JLabel(email.isBlank() ? "ta@g30.local" : email));
         topBar.add(right, BorderLayout.EAST);
         return topBar;
     }
@@ -351,7 +404,6 @@ public class TaDashboardFrame extends JFrame {
         title.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
         cvCard.add(title, BorderLayout.NORTH);
 
-        currentCvLabel.setText("No CV uploaded");
         cvCard.add(currentCvLabel, BorderLayout.CENTER);
 
         JButton uploadButton = UiTheme.secondaryButton("Upload / Replace CV");
@@ -367,21 +419,24 @@ public class TaDashboardFrame extends JFrame {
         JPanel left = new JPanel(new BorderLayout(12, 12));
         left.setBackground(UiTheme.PANEL_BACKGROUND);
         left.setBorder(UiTheme.cardBorder());
+
+        JPanel leftHeader = new JPanel(new BorderLayout(8, 8));
+        leftHeader.setOpaque(false);
         JLabel leftTitle = new JLabel("Available TA Jobs");
         leftTitle.setFont(UiTheme.SECTION_FONT);
-        left.add(leftTitle, BorderLayout.NORTH);
+        leftHeader.add(leftTitle, BorderLayout.WEST);
+        leftHeader.add(jobResultHintLabel, BorderLayout.SOUTH);
+        left.add(leftHeader, BorderLayout.NORTH);
         left.add(new JScrollPane(jobList), BorderLayout.CENTER);
 
         JPanel right = new JPanel(new BorderLayout(12, 12));
         right.setBackground(UiTheme.PANEL_BACKGROUND);
         right.setBorder(UiTheme.cardBorder());
 
-        JPanel header = new JPanel(new BorderLayout());
+        JPanel header = new JPanel(new BorderLayout(12, 12));
         header.setOpaque(false);
         jobTitleLabel.setFont(UiTheme.SECTION_FONT);
         header.add(jobTitleLabel, BorderLayout.WEST);
-        applyButton.setEnabled(false);
-        applyButton.addActionListener(e -> applyForSelectedJob());
         header.add(applyButton, BorderLayout.EAST);
         right.add(header, BorderLayout.NORTH);
 
