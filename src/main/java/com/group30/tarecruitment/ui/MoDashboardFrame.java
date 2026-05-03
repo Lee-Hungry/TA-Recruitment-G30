@@ -62,7 +62,7 @@ public class MoDashboardFrame extends JFrame {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
     private final DefaultTableModel postingsModel = new DefaultTableModel(
-            new Object[]{"Job Title", "Module", "Deadline", "Hours", "Stage"},
+            new Object[]{"Job Title", "Type", "Module", "Deadline", "Status"},
             0
     ) {
         @Override
@@ -70,6 +70,7 @@ public class MoDashboardFrame extends JFrame {
             return false;
         }
     };
+    private final JTable postingsTable = new JTable(postingsModel);
     private final DefaultTableModel applicantsModel = new DefaultTableModel(
             new Object[]{"Applicant", "Student ID", "Skills", "Applied", "Status"},
             0
@@ -83,12 +84,21 @@ public class MoDashboardFrame extends JFrame {
     private final JLabel totalPostingsValue = new JLabel();
     private final JLabel openPostingsValue = new JLabel();
     private final JLabel pendingApplicantsValue = new JLabel();
+    private final JLabel postingFormTitle = new JLabel("Post a new job");
+    private final JComboBox<String> jobTypeBox = new JComboBox<>(new String[]{"TA", "INVIGILATION"});
     private final JTextField jobTitleField = new JTextField();
     private final JTextField moduleCodeField = new JTextField();
     private final JTextField hoursField = new JTextField();
     private final JTextField deadlineField = new JTextField();
     private final JTextArea descriptionArea = new JTextArea(6, 20);
     private final JTextArea skillsArea = new JTextArea(4, 20);
+    private final JTextField examDateField = new JTextField();
+    private final JTextField examTimeField = new JTextField();
+    private final JTextField locationField = new JTextField();
+    private final JTextField invigilatorsField = new JTextField();
+    private final JButton submitPostingButton = UiTheme.primaryButton("Publish Job");
+    private final JButton cancelEditButton = UiTheme.secondaryButton("Cancel Edit");
+    private final JPanel invigilationFieldsPanel = UiTheme.transparentPanel();
     private final JComboBox<JobPosting> applicantJobSelector = new JComboBox<>();
     private final JLabel applicantNameLabel = new JLabel("Select an applicant");
     private final JLabel applicantMetaLabel = new JLabel("No applicant selected.");
@@ -127,10 +137,15 @@ public class MoDashboardFrame extends JFrame {
 
         UiTheme.styleTextArea(descriptionArea);
         UiTheme.styleTextArea(skillsArea);
+        UiTheme.styleInput(jobTypeBox);
         UiTheme.styleInput(jobTitleField);
         UiTheme.styleInput(moduleCodeField);
         UiTheme.styleInput(hoursField);
         UiTheme.styleInput(deadlineField);
+        UiTheme.styleInput(examDateField);
+        UiTheme.styleInput(examTimeField);
+        UiTheme.styleInput(locationField);
+        UiTheme.styleInput(invigilatorsField);
         UiTheme.styleInput(applicantJobSelector);
 
         applicantJobSelector.setRenderer(new DefaultListCellRenderer() {
@@ -161,6 +176,9 @@ public class MoDashboardFrame extends JFrame {
 
         acceptButton.addActionListener(e -> reviewSelectedApplicant("ACCEPTED"));
         rejectButton.addActionListener(e -> reviewSelectedApplicant("REJECTED"));
+        submitPostingButton.addActionListener(e -> savePosting());
+        cancelEditButton.addActionListener(e -> clearPostingForm());
+        jobTypeBox.addActionListener(e -> updatePostingModeUi());
         setApplicantActionsEnabled(false);
 
         JPanel root = new JPanel(new BorderLayout());
@@ -171,6 +189,7 @@ public class MoDashboardFrame extends JFrame {
 
         refreshMyPostings();
         refreshApplicantJobOptions();
+        updatePostingModeUi();
     }
 
     public MoDashboardFrame() {
@@ -217,7 +236,10 @@ public class MoDashboardFrame extends JFrame {
         sidebar.add(homeButton);
 
         JButton postButton = UiTheme.navButton("Job Posting");
-        postButton.addActionListener(e -> cardLayout.show(contentPanel, CARD_POST));
+        postButton.addActionListener(e -> {
+            clearPostingForm();
+            cardLayout.show(contentPanel, CARD_POST);
+        });
         sidebar.add(postButton);
 
         JButton postingsButton = UiTheme.navButton("My Postings");
@@ -259,14 +281,15 @@ public class MoDashboardFrame extends JFrame {
     private JPanel createTopBar() {
         JPanel topBar = new JPanel(new BorderLayout(12, 12));
         topBar.setBackground(UiTheme.APP_BACKGROUND);
-        JTextField searchField = new JTextField("Search postings, applicants...");
+        JTextField searchField = new JTextField();
         UiTheme.styleInput(searchField);
-        topBar.add(searchField, BorderLayout.CENTER);
+        searchField.setText("Search postings, applicants...");
+        topBar.add(searchField, BorderLayout.WEST);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
-        right.add(new JLabel("Hiring Board"));
-        right.add(new JLabel(moEmail.isBlank() ? "MO User" : moEmail));
+        right.add(new JLabel("MO User"));
+        right.add(new JLabel(moEmail.isBlank() ? "mo@g30.local" : moEmail));
         topBar.add(right, BorderLayout.EAST);
         return topBar;
     }
@@ -297,12 +320,13 @@ public class MoDashboardFrame extends JFrame {
         card.setBackground(UiTheme.PANEL_BACKGROUND);
         card.setBorder(UiTheme.cardBorder());
 
-        JLabel title = new JLabel("Post a new job");
-        title.setFont(UiTheme.TITLE_FONT);
-        card.add(title, BorderLayout.NORTH);
+        postingFormTitle.setFont(UiTheme.TITLE_FONT);
+        card.add(postingFormTitle, BorderLayout.NORTH);
 
         JPanel basicsPanel = UiTheme.transparentPanel();
         basicsPanel.setLayout(new BoxLayout(basicsPanel, BoxLayout.Y_AXIS));
+        basicsPanel.add(createFieldBlock("Job Type", jobTypeBox));
+        basicsPanel.add(UiTheme.verticalGap(14));
         basicsPanel.add(createFieldBlock("Job Title", jobTitleField));
         basicsPanel.add(UiTheme.verticalGap(14));
         basicsPanel.add(createFieldBlock("Module Code", moduleCodeField));
@@ -316,6 +340,8 @@ public class MoDashboardFrame extends JFrame {
         descriptionPanel.add(createTextAreaBlock("Required Skills", skillsArea));
         descriptionPanel.add(UiTheme.verticalGap(14));
         descriptionPanel.add(createTextAreaBlock("Job Description", descriptionArea));
+        descriptionPanel.add(UiTheme.verticalGap(14));
+        descriptionPanel.add(createInvigilationPanel());
 
         JPanel wrapper = new JPanel(new GridLayout(1, 2, 18, 18));
         wrapper.setOpaque(false);
@@ -323,23 +349,34 @@ public class MoDashboardFrame extends JFrame {
         wrapper.add(descriptionPanel);
         card.add(wrapper, BorderLayout.CENTER);
 
-        JButton submitButton = UiTheme.primaryButton("Publish Job");
-        submitButton.addActionListener(e -> postJob());
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         footer.setOpaque(false);
-        footer.add(submitButton);
+        footer.add(cancelEditButton);
+        footer.add(submitPostingButton);
         card.add(footer, BorderLayout.SOUTH);
         return card;
+    }
+
+    private JPanel createInvigilationPanel() {
+        invigilationFieldsPanel.setLayout(new BoxLayout(invigilationFieldsPanel, BoxLayout.Y_AXIS));
+        invigilationFieldsPanel.add(createFieldBlock("Exam Date (yyyy-MM-dd)", examDateField));
+        invigilationFieldsPanel.add(UiTheme.verticalGap(14));
+        invigilationFieldsPanel.add(createFieldBlock("Exam Time", examTimeField));
+        invigilationFieldsPanel.add(UiTheme.verticalGap(14));
+        invigilationFieldsPanel.add(createFieldBlock("Location", locationField));
+        invigilationFieldsPanel.add(UiTheme.verticalGap(14));
+        invigilationFieldsPanel.add(createFieldBlock("Invigilators Needed", invigilatorsField));
+        return invigilationFieldsPanel;
     }
 
     private JPanel createMyPostingsCard() {
         JPanel card = new JPanel(new BorderLayout(18, 18));
         card.setBackground(UiTheme.PANEL_BACKGROUND);
         card.setBorder(UiTheme.cardBorder());
-        JLabel title = new JLabel("My postings");
+        JLabel title = new JLabel("My Postings");
         title.setFont(UiTheme.TITLE_FONT);
         card.add(title, BorderLayout.NORTH);
-        card.add(new JScrollPane(new JTable(postingsModel)), BorderLayout.CENTER);
+        card.add(new JScrollPane(postingsTable), BorderLayout.CENTER);
         return card;
     }
 
@@ -386,18 +423,10 @@ public class MoDashboardFrame extends JFrame {
         return wrapper;
     }
 
-    private void postJob() {
+    private void savePosting() {
         try {
-            jobPostingService.postJob(new JobPostingDraft(
-                    moEmail,
-                    jobTitleField.getText(),
-                    moduleCodeField.getText(),
-                    descriptionArea.getText(),
-                    skillsArea.getText(),
-                    Integer.parseInt(hoursField.getText().trim()),
-                    LocalDate.parse(deadlineField.getText().trim())
-            ));
-            clearForm();
+            jobPostingService.postJob(buildDraftFromForm());
+            clearPostingForm();
             refreshMyPostings();
             refreshApplicantJobOptions();
             cardLayout.show(contentPanel, CARD_POSTINGS);
@@ -407,25 +436,67 @@ public class MoDashboardFrame extends JFrame {
         }
     }
 
-    private void clearForm() {
+    private JobPostingDraft buildDraftFromForm() {
+        String jobType = selectedJobType();
+        return new JobPostingDraft(
+                moEmail,
+                jobTitleField.getText(),
+                moduleCodeField.getText(),
+                descriptionArea.getText(),
+                skillsArea.getText(),
+                Integer.parseInt(hoursField.getText().trim()),
+                LocalDate.parse(deadlineField.getText().trim()),
+                jobType,
+                "INVIGILATION".equals(jobType) ? LocalDate.parse(examDateField.getText().trim()) : null,
+                "INVIGILATION".equals(jobType) ? examTimeField.getText() : "",
+                "INVIGILATION".equals(jobType) ? locationField.getText() : "",
+                "INVIGILATION".equals(jobType) ? Integer.parseInt(invigilatorsField.getText().trim()) : null
+        );
+    }
+
+    private void clearPostingForm() {
+        jobTypeBox.setSelectedItem("TA");
         jobTitleField.setText("");
         moduleCodeField.setText("");
         hoursField.setText("");
         deadlineField.setText("");
         descriptionArea.setText("");
         skillsArea.setText("");
+        examDateField.setText("");
+        examTimeField.setText("");
+        locationField.setText("");
+        invigilatorsField.setText("");
+        updatePostingModeUi();
+    }
+
+    private void updatePostingModeUi() {
+        boolean invigilation = "INVIGILATION".equals(selectedJobType());
+        invigilationFieldsPanel.setVisible(invigilation);
+        postingFormTitle.setText("Post a new job");
+        submitPostingButton.setText("Publish Job");
+        cancelEditButton.setVisible(false);
+        skillsArea.setToolTipText(invigilation
+                ? "Optional for invigilation jobs."
+                : "List required skills separated by commas.");
+        revalidate();
+        repaint();
+    }
+
+    private String selectedJobType() {
+        Object selected = jobTypeBox.getSelectedItem();
+        return selected == null ? "TA" : selected.toString().trim().toUpperCase();
     }
 
     private void refreshMyPostings() {
         postingsModel.setRowCount(0);
-        List<JobPosting> postings = jobPostingService.viewPostingsByMo(moEmail);
+        List<JobPosting> postings = jobPostingService.viewPostingsByOwner(moEmail);
         int openCount = 0;
         for (JobPosting posting : postings) {
             postingsModel.addRow(new Object[]{
                     posting.title(),
+                    posting.isInvigilation() ? "Invigilation" : "TA",
                     posting.moduleCode(),
                     posting.applicationDeadline(),
-                    posting.hoursPerWeek(),
                     posting.status()
             });
             if ("OPEN".equalsIgnoreCase(posting.status())) {
@@ -449,7 +520,7 @@ public class MoDashboardFrame extends JFrame {
 
     private void refreshApplicantJobOptions() {
         applicantJobSelector.removeAllItems();
-        List<JobPosting> postings = jobPostingService.viewPostingsByMo(moEmail);
+        List<JobPosting> postings = jobPostingService.viewPostingsByOwner(moEmail);
         for (JobPosting posting : postings) {
             applicantJobSelector.addItem(posting);
         }
@@ -495,7 +566,7 @@ public class MoDashboardFrame extends JFrame {
             applicantNameLabel.setText("Select an applicant");
             applicantMetaLabel.setText("No applicant selected.");
             applicantCvLabel.setText("CV path: -");
-            applicantProfileArea.setText("Choose a posting and an applicant to review the full TA profile, uploaded CV path, and latest application status.");
+            applicantProfileArea.setText("Choose a posting and an applicant to review the TA profile, uploaded CV path, and latest application status.");
             setApplicantActionsEnabled(false);
             return;
         }
@@ -573,13 +644,15 @@ public class MoDashboardFrame extends JFrame {
         showLoginFrame.run();
     }
 
-    private JPanel createFieldBlock(String labelText, JTextField field) {
+    private JPanel createFieldBlock(String labelText, Component field) {
         JPanel block = UiTheme.transparentPanel();
         block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
         JLabel label = new JLabel(labelText);
         label.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
         label.setAlignmentX(LEFT_ALIGNMENT);
-        field.setAlignmentX(LEFT_ALIGNMENT);
+        if (field instanceof javax.swing.JComponent component) {
+            component.setAlignmentX(LEFT_ALIGNMENT);
+        }
         block.add(label);
         block.add(Box.createVerticalStrut(6));
         block.add(field);
