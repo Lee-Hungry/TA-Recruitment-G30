@@ -9,4 +9,8 @@ public record UserAccount(
         String createdAt,
         String updatedAt
 ) {
+
+    public UserAccount withStatus(String nextStatus, String nextUpdatedAt) {
+        return new UserAccount(userId, email, passwordHash, role, nextStatus, createdAt, nextUpdatedAt);
+    }
 }

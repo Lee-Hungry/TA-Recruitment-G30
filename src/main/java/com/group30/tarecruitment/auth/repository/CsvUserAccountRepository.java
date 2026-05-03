@@ -2,6 +2,7 @@ package com.group30.tarecruitment.auth.repository;
 
 import com.group30.tarecruitment.auth.AuthRole;
 import com.group30.tarecruitment.auth.UserAccount;
+import com.group30.tarecruitment.csv.CsvSupport;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,18 +36,18 @@ public class CsvUserAccountRepository {
                 if (line.isEmpty()) {
                     continue;
                 }
-                String[] parts = line.split(",", -1);
-                if (parts.length < 7) {
+                List<String> parts = CsvSupport.parseRow(line);
+                if (parts.size() < 7) {
                     continue;
                 }
                 users.add(new UserAccount(
-                        parts[0],
-                        parts[1],
-                        parts[2],
-                        AuthRole.fromText(parts[3]),
-                        parts[4],
-                        parts[5],
-                        parts[6]
+                        parts.get(0),
+                        parts.get(1),
+                        parts.get(2),
+                        AuthRole.fromText(parts.get(3)),
+                        parts.get(4),
+                        parts.get(5),
+                        parts.get(6)
                 ));
             }
             return users;
@@ -57,19 +58,54 @@ public class CsvUserAccountRepository {
 
     public void append(UserAccount userAccount) {
         ensureFileExists();
-        String line = String.join(",",
+        try {
+            Files.writeString(csvPath, toCsv(userAccount) + System.lineSeparator(), StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to append user", e);
+        }
+    }
+
+    public void replace(UserAccount updated) {
+        List<UserAccount> users = readAll();
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add(HEADER);
+
+        boolean replaced = false;
+        for (UserAccount current : users) {
+            if (current.userId().equals(updated.userId())) {
+                rewritten.add(toCsv(updated));
+                replaced = true;
+            } else {
+                rewritten.add(toCsv(current));
+            }
+        }
+
+        if (!replaced) {
+            rewritten.add(toCsv(updated));
+        }
+
+        try {
+            Files.writeString(
+                    csvPath,
+                    String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to rewrite user csv", e);
+        }
+    }
+
+    private String toCsv(UserAccount userAccount) {
+        return CsvSupport.joinRow(
                 userAccount.userId(),
                 userAccount.email(),
                 userAccount.passwordHash(),
                 userAccount.role().name(),
                 userAccount.status(),
                 userAccount.createdAt(),
-                userAccount.updatedAt());
-        try {
-            Files.writeString(csvPath, line + System.lineSeparator(), StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to append user", e);
-        }
+                userAccount.updatedAt()
+        );
     }
 
     private void ensureFileExists() {
