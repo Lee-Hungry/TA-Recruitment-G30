@@ -1,7 +1,12 @@
 package com.group30.tarecruitment.ui;
 
+import com.group30.tarecruitment.admin.AdminUserAccountService;
+import com.group30.tarecruitment.admin.ManagedUserAccount;
 import com.group30.tarecruitment.admin.TaWorkloadService;
 import com.group30.tarecruitment.admin.TaWorkloadSummary;
+import com.group30.tarecruitment.jobs.JobPosting;
+import com.group30.tarecruitment.jobs.JobPostingDraft;
+import com.group30.tarecruitment.jobs.JobPostingService;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -9,6 +14,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -16,9 +22,12 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -26,12 +35,24 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AdminDashboardFrame extends JFrame {
 
+    private static final String CARD_WORKLOAD = "WORKLOAD";
+    private static final String CARD_USERS = "USERS";
+    private static final String CARD_POSTING = "POSTING";
+
+    private final String adminEmail;
     private final TaWorkloadService workloadService;
+    private final AdminUserAccountService userAccountService;
+    private final JobPostingService jobPostingService;
+    private final Runnable showLoginFrame;
+    private final CardLayout cardLayout = new CardLayout();
+    private final JPanel contentPanel = new JPanel(cardLayout);
+    private final JTextField searchField = new JTextField();
     private final DefaultTableModel workloadModel = new DefaultTableModel(
             new Object[]{"TA Name", "Student ID", "Assigned Modules", "Weekly Hours", "Overload Status"},
             0
@@ -48,22 +69,49 @@ public class AdminDashboardFrame extends JFrame {
     private final JLabel selectedTaLabel = new JLabel("Select a TA");
     private final JTextArea selectedTaDetail = buildReadonlyTextArea();
     private final List<TaWorkloadSummary> currentRows = new ArrayList<>();
-    private boolean returningToLogin;
+    private final DefaultTableModel accountModel = new DefaultTableModel(
+            new Object[]{"Name", "Email", "Role", "Status", "Student ID"},
+            0
+    ) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    private final JTable accountTable = new JTable(accountModel);
+    private final JLabel selectedAccountLabel = new JLabel("Select an account");
+    private final JTextArea selectedAccountDetail = buildReadonlyTextArea();
+    private final JButton deactivateButton = UiTheme.secondaryButton("Deactivate Account");
+    private final List<ManagedUserAccount> currentAccounts = new ArrayList<>();
 
-    public AdminDashboardFrame(String adminEmail, TaWorkloadService workloadService, Runnable showLoginFrame) {
+    private boolean returningToLogin;
+    private String activeCard = CARD_WORKLOAD;
+
+    public AdminDashboardFrame(
+            String adminEmail,
+            TaWorkloadService workloadService,
+            AdminUserAccountService userAccountService,
+            JobPostingService jobPostingService,
+            Runnable showLoginFrame
+    ) {
+        this.adminEmail = adminEmail == null ? "" : adminEmail.trim().toLowerCase();
         this.workloadService = workloadService;
+        this.userAccountService = userAccountService;
+        this.jobPostingService = jobPostingService;
+        this.showLoginFrame = showLoginFrame;
 
         setTitle("Admin Dashboard");
-        setSize(1280, 760);
+        setSize(1320, 780);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                returnToLogin(showLoginFrame);
+                returnToLogin();
             }
         });
 
+        UiTheme.styleInput(searchField);
         workloadTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         workloadTable.setDefaultRenderer(Object.class, new OverloadRenderer());
         workloadTable.getSelectionModel().addListSelectionListener(e -> {
@@ -72,17 +120,28 @@ public class AdminDashboardFrame extends JFrame {
                 showSelectedRow(row >= 0 && row < currentRows.size() ? currentRows.get(row) : null);
             }
         });
+        accountTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        accountTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int row = accountTable.getSelectedRow();
+                showSelectedAccount(row >= 0 && row < currentAccounts.size() ? currentAccounts.get(row) : null);
+            }
+        });
+        deactivateButton.addActionListener(e -> deactivateSelectedAccount());
+        deactivateButton.setEnabled(false);
+        bindLiveRefresh(searchField);
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(UiTheme.APP_BACKGROUND);
-        root.add(createSidebar(showLoginFrame), BorderLayout.WEST);
-        root.add(createMainContent(adminEmail), BorderLayout.CENTER);
+        root.add(createSidebar(), BorderLayout.WEST);
+        root.add(createMainContent(), BorderLayout.CENTER);
         setContentPane(root);
 
         refreshWorkload();
+        refreshAccounts();
     }
 
-    private JPanel createSidebar(Runnable showLoginFrame) {
+    private JPanel createSidebar() {
         JPanel sidebar = new JPanel();
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setPreferredSize(new Dimension(230, 0));
@@ -97,43 +156,53 @@ public class AdminDashboardFrame extends JFrame {
         badge.setAlignmentX(LEFT_ALIGNMENT);
         sidebar.add(badge);
         sidebar.add(Box.createVerticalStrut(16));
-        sidebar.add(UiTheme.navButton("Dashboard"));
-        sidebar.add(UiTheme.navButton("TA Workload"));
-        sidebar.add(UiTheme.navButton("Reports"));
+
+        JButton workloadButton = UiTheme.navButton("Dashboard");
+        workloadButton.addActionListener(e -> showCard(CARD_WORKLOAD));
+        sidebar.add(workloadButton);
+
+        JButton userButton = UiTheme.navButton("User Accounts");
+        userButton.addActionListener(e -> showCard(CARD_USERS));
+        sidebar.add(userButton);
+
+        JButton reportsButton = UiTheme.navButton("Reports");
+        reportsButton.addActionListener(e -> JOptionPane.showMessageDialog(this, "Report export is out of scope for this release."));
+        sidebar.add(reportsButton);
         sidebar.add(Box.createVerticalGlue());
 
         JButton backButton = UiTheme.secondaryButton("Back to Login");
-        backButton.addActionListener(e -> returnToLogin(showLoginFrame));
+        backButton.addActionListener(e -> returnToLogin());
         sidebar.add(backButton);
         return sidebar;
     }
 
-    private JPanel createMainContent(String adminEmail) {
+    private JPanel createMainContent() {
         JPanel panel = new JPanel(new BorderLayout(18, 18));
         panel.setBackground(UiTheme.APP_BACKGROUND);
         panel.setBorder(UiTheme.pagePadding());
-        panel.add(createTopBar(adminEmail), BorderLayout.NORTH);
-        panel.add(createDashboardCard(), BorderLayout.CENTER);
+        panel.add(createTopBar(), BorderLayout.NORTH);
+        contentPanel.setOpaque(false);
+        contentPanel.add(createWorkloadCard(), CARD_WORKLOAD);
+        contentPanel.add(createUserAccountsCard(), CARD_USERS);
+        panel.add(contentPanel, BorderLayout.CENTER);
         return panel;
     }
 
-    private JPanel createTopBar(String adminEmail) {
+    private JPanel createTopBar() {
         JPanel topBar = new JPanel(new BorderLayout(12, 12));
         topBar.setBackground(UiTheme.APP_BACKGROUND);
 
-        JTextField searchField = new JTextField("Search TAs, modules...");
-        UiTheme.styleInput(searchField);
-        topBar.add(searchField, BorderLayout.CENTER);
+        topBar.add(searchField, BorderLayout.WEST);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
-        right.add(new JLabel("Workload Monitor"));
-        right.add(new JLabel(adminEmail));
+        right.add(new JLabel("Admin User"));
+        right.add(new JLabel(adminEmail.isBlank() ? "admin@g30.local" : adminEmail));
         topBar.add(right, BorderLayout.EAST);
         return topBar;
     }
 
-    private JPanel createDashboardCard() {
+    private JPanel createWorkloadCard() {
         JPanel card = new JPanel(new BorderLayout(18, 18));
         card.setBackground(UiTheme.PANEL_BACKGROUND);
         card.setBorder(UiTheme.cardBorder());
@@ -148,6 +217,37 @@ public class AdminDashboardFrame extends JFrame {
         center.add(createWorkloadSplit(), BorderLayout.CENTER);
         card.add(center, BorderLayout.CENTER);
         return card;
+    }
+
+    private JPanel createUserAccountsCard() {
+        JPanel left = new JPanel(new BorderLayout(12, 12));
+        left.setBackground(UiTheme.PANEL_BACKGROUND);
+        left.setBorder(UiTheme.cardBorder());
+        JLabel title = new JLabel("User Accounts");
+        title.setFont(UiTheme.SECTION_FONT);
+        left.add(title, BorderLayout.NORTH);
+        left.add(new JScrollPane(accountTable), BorderLayout.CENTER);
+
+        JPanel right = new JPanel(new BorderLayout(12, 12));
+        right.setBackground(UiTheme.PANEL_BACKGROUND);
+        right.setBorder(UiTheme.cardBorder());
+        selectedAccountLabel.setFont(UiTheme.SECTION_FONT);
+        right.add(selectedAccountLabel, BorderLayout.NORTH);
+        right.add(new JScrollPane(selectedAccountDetail), BorderLayout.CENTER);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        actions.setOpaque(false);
+        actions.add(deactivateButton);
+        right.add(actions, BorderLayout.SOUTH);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
+        splitPane.setResizeWeight(0.58);
+        splitPane.setBorder(null);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(splitPane, BorderLayout.CENTER);
+        return wrapper;
     }
 
     private JPanel createMetricStrip() {
