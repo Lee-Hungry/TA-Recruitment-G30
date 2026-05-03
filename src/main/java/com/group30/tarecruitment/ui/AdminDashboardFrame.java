@@ -83,6 +83,26 @@ public class AdminDashboardFrame extends JFrame {
     private final JTextArea selectedAccountDetail = buildReadonlyTextArea();
     private final JButton deactivateButton = UiTheme.secondaryButton("Deactivate Account");
     private final List<ManagedUserAccount> currentAccounts = new ArrayList<>();
+    private final JTextField postingTitleField = new JTextField();
+    private final JTextField postingModuleField = new JTextField();
+    private final JTextField postingHoursField = new JTextField();
+    private final JTextField postingDeadlineField = new JTextField();
+    private final JTextField examDateField = new JTextField();
+    private final JTextField examTimeField = new JTextField();
+    private final JTextField locationField = new JTextField();
+    private final JTextField invigilatorsField = new JTextField();
+    private final JTextArea postingDescriptionArea = new JTextArea(5, 20);
+    private final JTextArea postingSkillsArea = new JTextArea(4, 20);
+    private final DefaultTableModel invigilationModel = new DefaultTableModel(
+            new Object[]{"Job Title", "Module", "Exam Date", "Location", "Status"},
+            0
+    ) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
+    private final JTable invigilationTable = new JTable(invigilationModel);
 
     private boolean returningToLogin;
     private String activeCard = CARD_WORKLOAD;
@@ -112,6 +132,16 @@ public class AdminDashboardFrame extends JFrame {
         });
 
         UiTheme.styleInput(searchField);
+        UiTheme.styleInput(postingTitleField);
+        UiTheme.styleInput(postingModuleField);
+        UiTheme.styleInput(postingHoursField);
+        UiTheme.styleInput(postingDeadlineField);
+        UiTheme.styleInput(examDateField);
+        UiTheme.styleInput(examTimeField);
+        UiTheme.styleInput(locationField);
+        UiTheme.styleInput(invigilatorsField);
+        UiTheme.styleTextArea(postingDescriptionArea);
+        UiTheme.styleTextArea(postingSkillsArea);
         workloadTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         workloadTable.setDefaultRenderer(Object.class, new OverloadRenderer());
         workloadTable.getSelectionModel().addListSelectionListener(e -> {
@@ -139,6 +169,7 @@ public class AdminDashboardFrame extends JFrame {
 
         refreshWorkload();
         refreshAccounts();
+        refreshInvigilationJobs();
     }
 
     private JPanel createSidebar() {
@@ -165,6 +196,10 @@ public class AdminDashboardFrame extends JFrame {
         userButton.addActionListener(e -> showCard(CARD_USERS));
         sidebar.add(userButton);
 
+        JButton postingButton = UiTheme.navButton("Job Posting");
+        postingButton.addActionListener(e -> showCard(CARD_POSTING));
+        sidebar.add(postingButton);
+
         JButton reportsButton = UiTheme.navButton("Reports");
         reportsButton.addActionListener(e -> JOptionPane.showMessageDialog(this, "Report export is out of scope for this release."));
         sidebar.add(reportsButton);
@@ -184,6 +219,7 @@ public class AdminDashboardFrame extends JFrame {
         contentPanel.setOpaque(false);
         contentPanel.add(createWorkloadCard(), CARD_WORKLOAD);
         contentPanel.add(createUserAccountsCard(), CARD_USERS);
+        contentPanel.add(createInvigilationPostingCard(), CARD_POSTING);
         panel.add(contentPanel, BorderLayout.CENTER);
         return panel;
     }
@@ -248,6 +284,72 @@ public class AdminDashboardFrame extends JFrame {
         wrapper.setOpaque(false);
         wrapper.add(splitPane, BorderLayout.CENTER);
         return wrapper;
+    }
+
+    private JPanel createInvigilationPostingCard() {
+        JPanel card = new JPanel(new BorderLayout(18, 18));
+        card.setBackground(UiTheme.PANEL_BACKGROUND);
+        card.setBorder(UiTheme.cardBorder());
+
+        JLabel title = new JLabel("Post an Invigilation Job");
+        title.setFont(UiTheme.TITLE_FONT);
+        card.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(1, 2, 18, 18));
+        form.setOpaque(false);
+
+        JPanel left = UiTheme.transparentPanel();
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        left.add(createFieldBlock("Job Title", postingTitleField));
+        left.add(UiTheme.verticalGap(14));
+        left.add(createFieldBlock("Module Code", postingModuleField));
+        left.add(UiTheme.verticalGap(14));
+        left.add(createFieldBlock("Hours per week", postingHoursField));
+        left.add(UiTheme.verticalGap(14));
+        left.add(createFieldBlock("Application Deadline (yyyy-MM-dd)", postingDeadlineField));
+        left.add(UiTheme.verticalGap(14));
+        left.add(createFieldBlock("Exam Date (yyyy-MM-dd)", examDateField));
+
+        JPanel right = UiTheme.transparentPanel();
+        right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
+        right.add(createFieldBlock("Exam Time", examTimeField));
+        right.add(UiTheme.verticalGap(14));
+        right.add(createFieldBlock("Location", locationField));
+        right.add(UiTheme.verticalGap(14));
+        right.add(createFieldBlock("Invigilators Needed", invigilatorsField));
+        right.add(UiTheme.verticalGap(14));
+        right.add(createTextAreaBlock("Required Skills", postingSkillsArea));
+        right.add(UiTheme.verticalGap(14));
+        right.add(createTextAreaBlock("Job Description", postingDescriptionArea));
+
+        form.add(left);
+        form.add(right);
+
+        JPanel center = new JPanel(new BorderLayout(18, 18));
+        center.setOpaque(false);
+        center.add(form, BorderLayout.NORTH);
+        center.add(new JScrollPane(invigilationTable), BorderLayout.CENTER);
+        card.add(center, BorderLayout.CENTER);
+
+        JButton publishButton = UiTheme.primaryButton("Publish Invigilation Job");
+        publishButton.addActionListener(e -> publishInvigilationJob());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        footer.setOpaque(false);
+        footer.add(publishButton);
+        card.add(footer, BorderLayout.SOUTH);
+        return card;
+    }
+
+    private void showCard(String cardName) {
+        activeCard = cardName;
+        cardLayout.show(contentPanel, cardName);
+        switch (cardName) {
+            case CARD_WORKLOAD -> refreshWorkload();
+            case CARD_USERS -> refreshAccounts();
+            case CARD_POSTING -> refreshInvigilationJobs();
+            default -> {
+            }
+        }
     }
 
     private JPanel createMetricStrip() {
@@ -333,6 +435,145 @@ public class AdminDashboardFrame extends JFrame {
         workloadTable.repaint();
     }
 
+    private void refreshAccounts() {
+        String query = normalizeSearch(searchField.getText());
+        currentAccounts.clear();
+        accountModel.setRowCount(0);
+        for (ManagedUserAccount account : userAccountService.listManageableAccounts()) {
+            if (!matchesAccountQuery(account, query)) {
+                continue;
+            }
+            currentAccounts.add(account);
+            accountModel.addRow(new Object[]{
+                    account.displayName(),
+                    account.email(),
+                    account.role(),
+                    account.status(),
+                    account.studentId().isBlank() ? "-" : account.studentId()
+            });
+        }
+        if (!currentAccounts.isEmpty()) {
+            accountTable.setRowSelectionInterval(0, 0);
+        } else {
+            showSelectedAccount(null);
+        }
+    }
+
+    private boolean matchesAccountQuery(ManagedUserAccount account, String query) {
+        if (query.isBlank()) {
+            return true;
+        }
+        return containsIgnoreCase(account.displayName(), query)
+                || containsIgnoreCase(account.email(), query)
+                || containsIgnoreCase(account.role(), query)
+                || containsIgnoreCase(account.status(), query)
+                || containsIgnoreCase(account.studentId(), query);
+    }
+
+    private void showSelectedAccount(ManagedUserAccount account) {
+        if (account == null) {
+            selectedAccountLabel.setText("Select an account");
+            selectedAccountDetail.setText("Choose a TA or MO account to review its current status.");
+            deactivateButton.setEnabled(false);
+            return;
+        }
+        selectedAccountLabel.setText(account.displayName());
+        selectedAccountDetail.setText(
+                "Email: " + account.email() + System.lineSeparator()
+                        + "Role: " + account.role() + System.lineSeparator()
+                        + "Status: " + account.status() + System.lineSeparator()
+                        + "Student ID: " + blankFallback(account.studentId()) + System.lineSeparator()
+                        + "Last Updated: " + blankFallback(account.updatedAt())
+        );
+        deactivateButton.setEnabled("ACTIVE".equalsIgnoreCase(account.status()));
+    }
+
+    private void deactivateSelectedAccount() {
+        int row = accountTable.getSelectedRow();
+        if (row < 0 || row >= currentAccounts.size()) {
+            JOptionPane.showMessageDialog(this, "Please select an account first.");
+            return;
+        }
+        ManagedUserAccount account = currentAccounts.get(row);
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Deactivate " + account.email() + "?",
+                "Confirm Deactivation",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            userAccountService.deactivateAccount(account.email());
+            refreshAccounts();
+            JOptionPane.showMessageDialog(this, "Account deactivated.");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Unable to deactivate account: " + ex.getMessage());
+        }
+    }
+
+    private void publishInvigilationJob() {
+        try {
+            jobPostingService.postJob(new JobPostingDraft(
+                    adminEmail,
+                    postingTitleField.getText(),
+                    postingModuleField.getText(),
+                    postingDescriptionArea.getText(),
+                    postingSkillsArea.getText(),
+                    Integer.parseInt(postingHoursField.getText().trim()),
+                    LocalDate.parse(postingDeadlineField.getText().trim()),
+                    "INVIGILATION",
+                    LocalDate.parse(examDateField.getText().trim()),
+                    examTimeField.getText(),
+                    locationField.getText(),
+                    Integer.parseInt(invigilatorsField.getText().trim())
+            ));
+            clearInvigilationForm();
+            refreshInvigilationJobs();
+            JOptionPane.showMessageDialog(this, "Invigilation job posted.");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Posting failed: " + ex.getMessage());
+        }
+    }
+
+    private void refreshInvigilationJobs() {
+        invigilationModel.setRowCount(0);
+        for (JobPosting posting : jobPostingService.viewPostingsByOwner(adminEmail)) {
+            if (!posting.isInvigilation()) {
+                continue;
+            }
+            invigilationModel.addRow(new Object[]{
+                    posting.title(),
+                    posting.moduleCode(),
+                    posting.examDate() == null ? "-" : posting.examDate().toString(),
+                    blankFallback(posting.location()),
+                    posting.status()
+            });
+        }
+    }
+
+    private void clearInvigilationForm() {
+        postingTitleField.setText("");
+        postingModuleField.setText("");
+        postingHoursField.setText("");
+        postingDeadlineField.setText("");
+        examDateField.setText("");
+        examTimeField.setText("");
+        locationField.setText("");
+        invigilatorsField.setText("");
+        postingDescriptionArea.setText("");
+        postingSkillsArea.setText("");
+    }
+
+    private String normalizeSearch(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private boolean containsIgnoreCase(String source, String query) {
+        return source != null && source.toLowerCase().contains(query);
+    }
+
     private void showSelectedRow(TaWorkloadSummary row) {
         if (row == null) {
             selectedTaLabel.setText("Select a TA");
@@ -361,7 +602,62 @@ public class AdminDashboardFrame extends JFrame {
         return area;
     }
 
-    private void returnToLogin(Runnable showLoginFrame) {
+    private void bindLiveRefresh(JTextField field) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                refreshActiveCard();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                refreshActiveCard();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                refreshActiveCard();
+            }
+        });
+    }
+
+    private void refreshActiveCard() {
+        switch (activeCard) {
+            case CARD_WORKLOAD -> refreshWorkload();
+            case CARD_USERS -> refreshAccounts();
+            default -> {
+            }
+        }
+    }
+
+    private JPanel createFieldBlock(String labelText, JTextField field) {
+        JPanel block = UiTheme.transparentPanel();
+        block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
+        JLabel label = new JLabel(labelText);
+        label.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        label.setAlignmentX(LEFT_ALIGNMENT);
+        field.setAlignmentX(LEFT_ALIGNMENT);
+        block.add(label);
+        block.add(Box.createVerticalStrut(6));
+        block.add(field);
+        return block;
+    }
+
+    private JPanel createTextAreaBlock(String labelText, JTextArea area) {
+        JPanel block = UiTheme.transparentPanel();
+        block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
+        JLabel label = new JLabel(labelText);
+        label.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        label.setAlignmentX(LEFT_ALIGNMENT);
+        JScrollPane scrollPane = UiTheme.createTextAreaScrollPane(area);
+        scrollPane.setAlignmentX(LEFT_ALIGNMENT);
+        block.add(label);
+        block.add(Box.createVerticalStrut(6));
+        block.add(scrollPane);
+        return block;
+    }
+
+    private void returnToLogin() {
         if (returningToLogin) {
             return;
         }

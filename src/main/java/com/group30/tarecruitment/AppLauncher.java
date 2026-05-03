@@ -1,5 +1,6 @@
 package com.group30.tarecruitment;
 
+import com.group30.tarecruitment.admin.AdminUserAccountService;
 import com.group30.tarecruitment.admin.TaWorkloadService;
 import com.group30.tarecruitment.admin.WorkloadSettingsRepository;
 import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
@@ -60,6 +61,7 @@ public class AppLauncher {
             );
             JobPostingService jobPostingService = new JobPostingService(
                     jobRepository,
+                    applicationRepository,
                     Clock.systemDefaultZone()
             );
             JobApplicationService applicationService = new JobApplicationService(
@@ -75,6 +77,11 @@ public class AppLauncher {
                     applicationRepository,
                     new WorkloadSettingsRepository(settingsFile)
             );
+            AdminUserAccountService userAccountService = new AdminUserAccountService(
+                    userAccountRepository,
+                    profileRepository,
+                    Clock.systemDefaultZone()
+            );
 
             LoginFrame frame = new LoginFrame(
                     authService,
@@ -84,7 +91,8 @@ public class AppLauncher {
                     profileService,
                     jobPostingService,
                     applicationService,
-                    workloadService
+                    workloadService,
+                    userAccountService
             );
             frame.setVisible(true);
         });
