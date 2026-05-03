@@ -57,6 +57,7 @@ public class MoLoginFrame extends JFrame {
                     loginService,
                     new JobPostingService(
                             new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                            new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
                             Clock.systemDefaultZone()
                     ),
                     new JobApplicationService(
