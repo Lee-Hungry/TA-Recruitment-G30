@@ -106,8 +106,10 @@ public class MoDashboardFrame extends JFrame {
     private final JTextArea applicantProfileArea = buildReadonlyTextArea();
     private final JButton acceptButton = UiTheme.primaryButton("Accept");
     private final JButton rejectButton = UiTheme.secondaryButton("Reject");
+    private final List<JobPosting> currentPostings = new ArrayList<>();
     private final List<MoApplicantView> currentApplicants = new ArrayList<>();
     private boolean returningToLogin;
+    private String editingJobId = "";
 
     public MoDashboardFrame(
             String moEmail,
@@ -147,6 +149,7 @@ public class MoDashboardFrame extends JFrame {
         UiTheme.styleInput(locationField);
         UiTheme.styleInput(invigilatorsField);
         UiTheme.styleInput(applicantJobSelector);
+        installPostingSelection();
 
         applicantJobSelector.setRenderer(new DefaultListCellRenderer() {
             @Override
@@ -377,6 +380,19 @@ public class MoDashboardFrame extends JFrame {
         title.setFont(UiTheme.TITLE_FONT);
         card.add(title, BorderLayout.NORTH);
         card.add(new JScrollPane(postingsTable), BorderLayout.CENTER);
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        actions.setOpaque(false);
+        JButton editButton = UiTheme.secondaryButton("Edit Selected");
+        JButton deleteButton = UiTheme.secondaryButton("Delete Selected");
+        JButton refreshButton = UiTheme.primaryButton("Refresh");
+        editButton.addActionListener(e -> editSelectedPosting());
+        deleteButton.addActionListener(e -> deleteSelectedPosting());
+        refreshButton.addActionListener(e -> refreshMyPostings());
+        actions.add(editButton);
+        actions.add(deleteButton);
+        actions.add(refreshButton);
+        card.add(actions, BorderLayout.SOUTH);
         return card;
     }
 
@@ -454,6 +470,15 @@ public class MoDashboardFrame extends JFrame {
         );
     }
 
+    private void installPostingSelection() {
+        postingsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        postingsTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                refreshPostingActionState();
+            }
+        });
+    }
+
     private void clearPostingForm() {
         jobTypeBox.setSelectedItem("TA");
         jobTitleField.setText("");
@@ -472,9 +497,9 @@ public class MoDashboardFrame extends JFrame {
     private void updatePostingModeUi() {
         boolean invigilation = "INVIGILATION".equals(selectedJobType());
         invigilationFieldsPanel.setVisible(invigilation);
-        postingFormTitle.setText("Post a new job");
-        submitPostingButton.setText("Publish Job");
-        cancelEditButton.setVisible(false);
+        postingFormTitle.setText(editingJobId.isBlank() ? "Post a new job" : "Edit selected job");
+        submitPostingButton.setText(editingJobId.isBlank() ? "Publish Job" : "Save Changes");
+        cancelEditButton.setVisible(!editingJobId.isBlank());
         skillsArea.setToolTipText(invigilation
                 ? "Optional for invigilation jobs."
                 : "List required skills separated by commas.");
@@ -488,8 +513,11 @@ public class MoDashboardFrame extends JFrame {
     }
 
     private void refreshMyPostings() {
+        String selectedJobId = selectedPostingId();
         postingsModel.setRowCount(0);
+        currentPostings.clear();
         List<JobPosting> postings = jobPostingService.viewPostingsByOwner(moEmail);
+        currentPostings.addAll(postings);
         int openCount = 0;
         for (JobPosting posting : postings) {
             postingsModel.addRow(new Object[]{
@@ -506,6 +534,11 @@ public class MoDashboardFrame extends JFrame {
         totalPostingsValue.setText(Integer.toString(postings.size()));
         openPostingsValue.setText(Integer.toString(openCount));
         pendingApplicantsValue.setText(Integer.toString(countPendingApplicants(postings)));
+        if (!currentPostings.isEmpty()) {
+            int selectedIndex = findPostingIndex(selectedJobId);
+            postingsTable.setRowSelectionInterval(selectedIndex >= 0 ? selectedIndex : 0, selectedIndex >= 0 ? selectedIndex : 0);
+        }
+        refreshPostingActionState();
     }
 
     private int countPendingApplicants(List<JobPosting> postings) {
@@ -605,6 +638,85 @@ public class MoDashboardFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "Application updated to " + nextStatus + ".");
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, "Decision failed: " + ex.getMessage());
+        }
+    }
+
+    private void editSelectedPosting() {
+        JobPosting posting = selectedPosting();
+        if (posting == null) {
+            JOptionPane.showMessageDialog(this, "Please select a posting first.");
+            return;
+        }
+        editingJobId = posting.jobId();
+        jobTypeBox.setSelectedItem(posting.jobType());
+        jobTitleField.setText(posting.title());
+        moduleCodeField.setText(posting.moduleCode());
+        hoursField.setText(Integer.toString(posting.hoursPerWeek()));
+        deadlineField.setText(posting.applicationDeadline().toString());
+        descriptionArea.setText(posting.description());
+        skillsArea.setText(posting.requiredSkills());
+        examDateField.setText(posting.examDate() == null ? "" : posting.examDate().toString());
+        examTimeField.setText(posting.examTime());
+        locationField.setText(posting.location());
+        invigilatorsField.setText(posting.invigilatorsNeeded() <= 0 ? "" : Integer.toString(posting.invigilatorsNeeded()));
+        updatePostingModeUi();
+        cardLayout.show(contentPanel, CARD_POST);
+    }
+
+    private void deleteSelectedPosting() {
+        JobPosting posting = selectedPosting();
+        if (posting == null) {
+            JOptionPane.showMessageDialog(this, "Please select a posting first.");
+            return;
+        }
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Delete the selected posting?",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            jobPostingService.deletePosting(moEmail, posting.jobId());
+            if (posting.jobId().equals(editingJobId)) {
+                editingJobId = "";
+                clearPostingForm();
+            }
+            refreshMyPostings();
+            refreshApplicantJobOptions();
+            JOptionPane.showMessageDialog(this, "Posting deleted.");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Delete failed: " + ex.getMessage());
+        }
+    }
+
+    private JobPosting selectedPosting() {
+        int row = postingsTable.getSelectedRow();
+        if (row < 0 || row >= currentPostings.size()) {
+            return null;
+        }
+        return currentPostings.get(row);
+    }
+
+    private String selectedPostingId() {
+        JobPosting selected = selectedPosting();
+        return selected == null ? "" : selected.jobId();
+    }
+
+    private int findPostingIndex(String jobId) {
+        for (int i = 0; i < currentPostings.size(); i++) {
+            if (currentPostings.get(i).jobId().equals(jobId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void refreshPostingActionState() {
+        if (selectedPosting() == null && !currentPostings.isEmpty()) {
+            postingsTable.setRowSelectionInterval(0, 0);
         }
     }
 
