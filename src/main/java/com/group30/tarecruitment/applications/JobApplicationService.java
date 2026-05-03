@@ -39,7 +39,8 @@ public class JobApplicationService {
 
         boolean duplicateExists = applicationRepository.readAll().stream()
                 .anyMatch(application -> application.jobId().equals(posting.jobId())
-                        && application.taEmail().equalsIgnoreCase(normalizedEmail));
+                        && application.taEmail().equalsIgnoreCase(normalizedEmail)
+                        && !application.isWithdrawn());
         if (duplicateExists) {
             throw new IllegalArgumentException("DUPLICATE_APPLICATION");
         }
@@ -93,6 +94,7 @@ public class JobApplicationService {
         JobPosting posting = getOwnedJob(moEmail, jobId);
         return applicationRepository.readAll().stream()
                 .filter(application -> application.jobId().equals(posting.jobId()))
+                .filter(application -> !application.isWithdrawn())
                 .sorted(Comparator.comparing(JobApplication::appliedAt))
                 .map(application -> toMoApplicantView(posting, application))
                 .toList();
@@ -108,12 +110,30 @@ public class JobApplicationService {
                 .filter(application -> application.applicationId().equals(applicationId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("APPLICATION_NOT_FOUND"));
+        if (current.isWithdrawn()) {
+            throw new IllegalArgumentException("APPLICATION_WITHDRAWN");
+        }
         JobPosting posting = getOwnedJob(moEmail, current.jobId());
         if (posting.applicationDeadline().isBefore(OffsetDateTime.now(clock).toLocalDate())) {
             throw new IllegalArgumentException("DECISION_DEADLINE_PASSED");
         }
 
         JobApplication updated = current.withStatus(normalizedStatus, OffsetDateTime.now(clock).toString());
+        applicationRepository.replace(updated);
+        return updated;
+    }
+
+    public JobApplication withdrawApplication(String taEmail, String applicationId) {
+        String normalizedEmail = normalizeEmail(taEmail);
+        JobApplication current = applicationRepository.readAll().stream()
+                .filter(application -> application.applicationId().equals(applicationId))
+                .filter(application -> application.taEmail().equalsIgnoreCase(normalizedEmail))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("APPLICATION_NOT_FOUND"));
+        if (!"PENDING".equalsIgnoreCase(current.status())) {
+            throw new IllegalArgumentException("APPLICATION_WITHDRAW_NOT_ALLOWED");
+        }
+        JobApplication updated = current.withStatus("WITHDRAWN", OffsetDateTime.now(clock).toString());
         applicationRepository.replace(updated);
         return updated;
     }
