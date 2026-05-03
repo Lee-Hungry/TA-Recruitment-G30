@@ -76,16 +76,19 @@ public class CsvJobApplicationRepository {
             rewritten.add(toCsv(updated));
         }
 
-        try {
-            Files.writeString(
-                    csvPath,
-                    String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.WRITE
-            );
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to rewrite job application csv", e);
+        rewrite(rewritten);
+    }
+
+    public void deleteByJobId(String jobId) {
+        List<JobApplication> applications = readAll();
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add(HEADER);
+        for (JobApplication application : applications) {
+            if (!application.jobId().equals(jobId)) {
+                rewritten.add(toCsv(application));
+            }
         }
+        rewrite(rewritten);
     }
 
     private String toCsv(JobApplication application) {
@@ -97,6 +100,19 @@ public class CsvJobApplicationRepository {
                 application.appliedAt(),
                 application.updatedAt()
         );
+    }
+
+    private void rewrite(List<String> rewritten) {
+        try {
+            Files.writeString(
+                    csvPath,
+                    String.join(System.lineSeparator(), rewritten) + System.lineSeparator(),
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to rewrite job application csv", e);
+        }
     }
 
     private void ensureFileExists() {
