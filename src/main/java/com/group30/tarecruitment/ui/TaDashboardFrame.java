@@ -18,6 +18,7 @@ import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -30,6 +31,8 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
@@ -55,6 +58,7 @@ public class TaDashboardFrame extends JFrame {
     private static final String CARD_PROFILE = "PROFILE";
     private static final String CARD_JOBS = "JOBS";
     private static final String CARD_APPLICATIONS = "APPLICATIONS";
+    private static final String FILTER_ALL = "All";
 
     private final String email;
     private final String sessionId;
@@ -77,8 +81,13 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea skillsArea = new JTextArea(4, 20);
     private final JTextArea availabilityArea = new JTextArea(4, 20);
     private final JLabel currentCvLabel = new JLabel("No CV uploaded");
+    private final JTextField jobSearchField = new JTextField();
+    private final JComboBox<String> moduleFilterBox = new JComboBox<>();
+    private final JComboBox<String> skillFilterBox = new JComboBox<>();
+    private final JButton clearFiltersButton = UiTheme.secondaryButton("Clear Filters");
     private final DefaultListModel<JobPosting> jobListModel = new DefaultListModel<>();
     private final JList<JobPosting> jobList = new JList<>(jobListModel);
+    private final JLabel jobResultHintLabel = new JLabel("Browse open jobs.");
     private final JLabel jobTitleLabel = new JLabel("Select a job");
     private final JLabel jobMetaLabel = new JLabel("No job selected.");
     private final JTextArea jobDescriptionArea = buildReadonlyTextArea();
@@ -97,8 +106,10 @@ public class TaDashboardFrame extends JFrame {
     private final JLabel applicationTitleLabel = new JLabel("Select an application");
     private final JLabel applicationMetaLabel = new JLabel("No application selected.");
     private final JTextArea applicationNotesArea = buildReadonlyTextArea();
+    private final JButton withdrawButton = UiTheme.secondaryButton("Withdraw Application");
     private final List<TaApplicationSummary> currentApplications = new ArrayList<>();
     private boolean returningToLogin;
+    private boolean updatingJobFilters;
     private String selectedCvPath = "";
 
     public TaDashboardFrame(
@@ -129,28 +140,8 @@ public class TaDashboardFrame extends JFrame {
             }
         });
 
-        UiTheme.styleTextArea(skillsArea);
-        UiTheme.styleTextArea(availabilityArea);
-        UiTheme.styleTextArea(applicationNotesArea);
-        applicationNotesArea.setEditable(false);
-        currentCvLabel.setFont(UiTheme.BODY_FONT);
-
-        jobList.setCellRenderer(new JobRenderer());
-        jobList.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                showSelectedJob(jobList.getSelectedValue());
-            }
-        });
-
-        applicationTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        applicationTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                int selectedRow = applicationTable.getSelectedRow();
-                showSelectedApplication(selectedRow >= 0 && selectedRow < currentApplications.size()
-                        ? currentApplications.get(selectedRow)
-                        : null);
-            }
-        });
+        styleFields();
+        installInteractions();
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(UiTheme.APP_BACKGROUND);
@@ -158,13 +149,8 @@ public class TaDashboardFrame extends JFrame {
         root.add(createMainArea(), BorderLayout.CENTER);
         setContentPane(root);
 
-        UiTheme.styleInput(fullNameField);
-        UiTheme.styleInput(studentIdField);
-        UiTheme.styleInput(contactEmailField);
-        UiTheme.styleInput(degreeField);
-        UiTheme.styleInput(gpaField);
-
         loadProfile();
+        refreshJobFilters();
         refreshJobList();
         refreshApplications();
         refreshDashboardSummary();
@@ -185,6 +171,65 @@ public class TaDashboardFrame extends JFrame {
                 ),
                 showLoginFrame
         );
+    }
+
+    private void styleFields() {
+        UiTheme.styleTextArea(skillsArea);
+        UiTheme.styleTextArea(availabilityArea);
+        UiTheme.styleTextArea(applicationNotesArea);
+        applicationNotesArea.setEditable(false);
+        currentCvLabel.setFont(UiTheme.BODY_FONT);
+
+        UiTheme.styleInput(fullNameField);
+        UiTheme.styleInput(studentIdField);
+        UiTheme.styleInput(contactEmailField);
+        UiTheme.styleInput(degreeField);
+        UiTheme.styleInput(gpaField);
+        UiTheme.styleInput(jobSearchField);
+        UiTheme.styleInput(moduleFilterBox);
+        UiTheme.styleInput(skillFilterBox);
+    }
+
+    private void installInteractions() {
+        jobList.setCellRenderer(new JobRenderer());
+        jobList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                showSelectedJob(jobList.getSelectedValue());
+            }
+        });
+
+        applicationTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        applicationTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int selectedRow = applicationTable.getSelectedRow();
+                showSelectedApplication(selectedRow >= 0 && selectedRow < currentApplications.size()
+                        ? currentApplications.get(selectedRow)
+                        : null);
+            }
+        });
+
+        bindLiveRefresh(jobSearchField, this::refreshJobList);
+        moduleFilterBox.addActionListener(e -> {
+            if (!updatingJobFilters) {
+                refreshJobList();
+            }
+        });
+        skillFilterBox.addActionListener(e -> {
+            if (!updatingJobFilters) {
+                refreshJobList();
+            }
+        });
+        clearFiltersButton.addActionListener(e -> {
+            updatingJobFilters = true;
+            jobSearchField.setText("");
+            moduleFilterBox.setSelectedItem(FILTER_ALL);
+            skillFilterBox.setSelectedItem(FILTER_ALL);
+            updatingJobFilters = false;
+            refreshJobList();
+        });
+        applyButton.addActionListener(e -> applyForSelectedJob());
+        withdrawButton.addActionListener(e -> withdrawSelectedApplication());
+        withdrawButton.setEnabled(false);
     }
 
     private JPanel createSidebar() {
@@ -219,6 +264,7 @@ public class TaDashboardFrame extends JFrame {
 
         JButton jobsButton = UiTheme.navButton("Find Jobs");
         jobsButton.addActionListener(e -> {
+            refreshJobFilters();
             refreshJobList();
             cardLayout.show(contentPanel, CARD_JOBS);
         });
@@ -260,14 +306,24 @@ public class TaDashboardFrame extends JFrame {
     private JPanel createTopBar() {
         JPanel topBar = new JPanel(new BorderLayout(12, 12));
         topBar.setBackground(UiTheme.APP_BACKGROUND);
-        JTextField searchField = new JTextField("Search jobs, skills...");
-        UiTheme.styleInput(searchField);
-        topBar.add(searchField, BorderLayout.CENTER);
+
+        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        filters.setOpaque(false);
+
+        jobSearchField.setPreferredSize(new Dimension(280, UiTheme.FIELD_HEIGHT));
+        moduleFilterBox.setPreferredSize(new Dimension(160, UiTheme.FIELD_HEIGHT));
+        skillFilterBox.setPreferredSize(new Dimension(170, UiTheme.FIELD_HEIGHT));
+
+        filters.add(jobSearchField);
+        filters.add(moduleFilterBox);
+        filters.add(skillFilterBox);
+        filters.add(clearFiltersButton);
+        topBar.add(filters, BorderLayout.WEST);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
-        right.add(new JLabel("Sprint 2 Ready"));
-        right.add(new JLabel(email.isBlank() ? "TA User" : email));
+        right.add(new JLabel("TA User"));
+        right.add(new JLabel(email.isBlank() ? "ta@g30.local" : email));
         topBar.add(right, BorderLayout.EAST);
         return topBar;
     }
@@ -351,7 +407,6 @@ public class TaDashboardFrame extends JFrame {
         title.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
         cvCard.add(title, BorderLayout.NORTH);
 
-        currentCvLabel.setText("No CV uploaded");
         cvCard.add(currentCvLabel, BorderLayout.CENTER);
 
         JButton uploadButton = UiTheme.secondaryButton("Upload / Replace CV");
@@ -367,21 +422,24 @@ public class TaDashboardFrame extends JFrame {
         JPanel left = new JPanel(new BorderLayout(12, 12));
         left.setBackground(UiTheme.PANEL_BACKGROUND);
         left.setBorder(UiTheme.cardBorder());
+
+        JPanel leftHeader = new JPanel(new BorderLayout(8, 8));
+        leftHeader.setOpaque(false);
         JLabel leftTitle = new JLabel("Available TA Jobs");
         leftTitle.setFont(UiTheme.SECTION_FONT);
-        left.add(leftTitle, BorderLayout.NORTH);
+        leftHeader.add(leftTitle, BorderLayout.WEST);
+        leftHeader.add(jobResultHintLabel, BorderLayout.SOUTH);
+        left.add(leftHeader, BorderLayout.NORTH);
         left.add(new JScrollPane(jobList), BorderLayout.CENTER);
 
         JPanel right = new JPanel(new BorderLayout(12, 12));
         right.setBackground(UiTheme.PANEL_BACKGROUND);
         right.setBorder(UiTheme.cardBorder());
 
-        JPanel header = new JPanel(new BorderLayout());
+        JPanel header = new JPanel(new BorderLayout(12, 12));
         header.setOpaque(false);
         jobTitleLabel.setFont(UiTheme.SECTION_FONT);
         header.add(jobTitleLabel, BorderLayout.WEST);
-        applyButton.setEnabled(false);
-        applyButton.addActionListener(e -> applyForSelectedJob());
         header.add(applyButton, BorderLayout.EAST);
         right.add(header, BorderLayout.NORTH);
 
@@ -401,7 +459,7 @@ public class TaDashboardFrame extends JFrame {
 
         JPanel skillCard = new JPanel(new BorderLayout(8, 8));
         skillCard.setOpaque(false);
-        JLabel skillTitle = new JLabel("Required Skills");
+        JLabel skillTitle = new JLabel("Required Skills / Notes");
         skillTitle.setFont(UiTheme.SECTION_FONT);
         skillCard.add(skillTitle, BorderLayout.NORTH);
         skillCard.add(new JScrollPane(jobSkillArea), BorderLayout.CENTER);
@@ -441,8 +499,13 @@ public class TaDashboardFrame extends JFrame {
         details.add(new JScrollPane(applicationNotesArea), BorderLayout.CENTER);
         right.add(details, BorderLayout.CENTER);
 
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        actions.setOpaque(false);
+        actions.add(withdrawButton);
+        right.add(actions, BorderLayout.SOUTH);
+
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
-        splitPane.setResizeWeight(0.52);
+        splitPane.setResizeWeight(0.54);
         splitPane.setBorder(null);
 
         JPanel wrapper = new JPanel(new BorderLayout());
@@ -505,16 +568,76 @@ public class TaDashboardFrame extends JFrame {
     }
 
     private void refreshJobList() {
+        String previousSelection = jobList.getSelectedValue() == null ? "" : jobList.getSelectedValue().jobId();
         jobListModel.clear();
-        for (JobPosting posting : jobPostingService.browseOpenJobs()) {
+
+        List<JobPosting> results = jobPostingService.browseOpenJobs(
+                jobSearchField.getText(),
+                selectedFilterValue(skillFilterBox),
+                selectedFilterValue(moduleFilterBox)
+        );
+        for (JobPosting posting : results) {
             jobListModel.addElement(posting);
         }
-        if (!jobListModel.isEmpty()) {
-            jobList.setSelectedIndex(0);
+
+        if (!results.isEmpty()) {
+            int selectedIndex = findJobIndex(previousSelection);
+            jobList.setSelectedIndex(selectedIndex >= 0 ? selectedIndex : 0);
+            jobResultHintLabel.setText(results.size() + " open job(s) found.");
         } else {
             showSelectedJob(null);
+            jobResultHintLabel.setText(hasActiveFilters()
+                    ? "No jobs match the current search and filters."
+                    : "No open jobs are available right now.");
         }
         refreshDashboardSummary();
+    }
+
+    private void refreshJobFilters() {
+        updatingJobFilters = true;
+        String selectedModule = selectedFilterValue(moduleFilterBox);
+        String selectedSkill = selectedFilterValue(skillFilterBox);
+
+        populateFilterBox(moduleFilterBox, jobPostingService.listOpenJobModules(), selectedModule);
+        populateFilterBox(skillFilterBox, jobPostingService.listOpenJobSkills(), selectedSkill);
+        updatingJobFilters = false;
+    }
+
+    private void populateFilterBox(JComboBox<String> comboBox, List<String> values, String selection) {
+        comboBox.removeAllItems();
+        comboBox.addItem(FILTER_ALL);
+        for (String value : values) {
+            comboBox.addItem(value);
+        }
+        if (selection != null && !selection.isBlank()) {
+            comboBox.setSelectedItem(selection);
+        } else {
+            comboBox.setSelectedItem(FILTER_ALL);
+        }
+    }
+
+    private int findJobIndex(String jobId) {
+        for (int i = 0; i < jobListModel.size(); i++) {
+            if (jobListModel.get(i).jobId().equals(jobId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean hasActiveFilters() {
+        return !jobSearchField.getText().trim().isBlank()
+                || !selectedFilterValue(moduleFilterBox).isBlank()
+                || !selectedFilterValue(skillFilterBox).isBlank();
+    }
+
+    private String selectedFilterValue(JComboBox<String> comboBox) {
+        Object selected = comboBox.getSelectedItem();
+        if (selected == null) {
+            return "";
+        }
+        String value = selected.toString().trim();
+        return FILTER_ALL.equalsIgnoreCase(value) ? "" : value;
     }
 
     private void showSelectedJob(JobPosting job) {
@@ -527,10 +650,39 @@ public class TaDashboardFrame extends JFrame {
             return;
         }
         jobTitleLabel.setText(job.moduleCode() + ": " + job.title());
-        jobMetaLabel.setText("Hours " + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline());
-        jobDescriptionArea.setText(job.description());
-        jobSkillArea.setText(job.requiredSkills());
+        jobMetaLabel.setText(buildJobMeta(job));
+        jobDescriptionArea.setText(buildJobDescription(job));
+        jobSkillArea.setText(buildSkillNotes(job));
         applyButton.setEnabled(true);
+    }
+
+    private String buildJobMeta(JobPosting job) {
+        String typeLabel = job.isInvigilation() ? "Invigilation" : "TA";
+        return typeLabel + " | " + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline();
+    }
+
+    private String buildJobDescription(JobPosting job) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(job.description());
+        builder.append(System.lineSeparator()).append(System.lineSeparator());
+        if (job.isInvigilation()) {
+            builder.append("Exam Date: ").append(blankFallback(job.examDate() == null ? "" : job.examDate().toString())).append(System.lineSeparator());
+            builder.append("Exam Time: ").append(blankFallback(job.examTime())).append(System.lineSeparator());
+            builder.append("Location: ").append(blankFallback(job.location())).append(System.lineSeparator());
+            builder.append("Invigilators Needed: ").append(job.invigilatorsNeeded());
+        } else {
+            builder.append("Module Code: ").append(job.moduleCode());
+        }
+        return builder.toString();
+    }
+
+    private String buildSkillNotes(JobPosting job) {
+        String skills = blankFallback(job.requiredSkills());
+        if (job.isInvigilation()) {
+            return "Required Skills: " + skills + System.lineSeparator() + System.lineSeparator()
+                    + "This is an invigilation opportunity. Application review follows the same workflow as standard TA jobs.";
+        }
+        return skills;
     }
 
     private void applyForSelectedJob() {
@@ -551,6 +703,7 @@ public class TaDashboardFrame extends JFrame {
     }
 
     private void refreshApplications() {
+        String selectedApplicationId = selectedApplicationId();
         currentApplications.clear();
         currentApplications.addAll(applicationService.listApplicationsForTa(email));
         applicationTableModel.setRowCount(0);
@@ -563,10 +716,28 @@ public class TaDashboardFrame extends JFrame {
             });
         }
         if (!currentApplications.isEmpty()) {
-            applicationTable.setRowSelectionInterval(0, 0);
+            int selectedRow = findApplicationIndex(selectedApplicationId);
+            applicationTable.setRowSelectionInterval(selectedRow >= 0 ? selectedRow : 0, selectedRow >= 0 ? selectedRow : 0);
         } else {
             showSelectedApplication(null);
         }
+    }
+
+    private String selectedApplicationId() {
+        int selectedRow = applicationTable.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= currentApplications.size()) {
+            return "";
+        }
+        return currentApplications.get(selectedRow).applicationId();
+    }
+
+    private int findApplicationIndex(String applicationId) {
+        for (int i = 0; i < currentApplications.size(); i++) {
+            if (currentApplications.get(i).applicationId().equals(applicationId)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void showSelectedApplication(TaApplicationSummary application) {
@@ -574,6 +745,7 @@ public class TaDashboardFrame extends JFrame {
             applicationTitleLabel.setText("Select an application");
             applicationMetaLabel.setText("No applications submitted yet.");
             applicationNotesArea.setText("Apply for an open job to see its latest review status here.");
+            withdrawButton.setEnabled(false);
             return;
         }
 
@@ -582,8 +754,40 @@ public class TaDashboardFrame extends JFrame {
         applicationNotesArea.setText(switch (application.status()) {
             case "ACCEPTED" -> "Your application has been accepted by the module organiser. The assigned weekly hours will now appear in the admin workload view.";
             case "REJECTED" -> "This application was not selected. You can continue applying to other open TA roles.";
-            default -> "This application is still pending review. Check back here for the latest MO decision.";
+            case "WITHDRAWN" -> "You withdrew this application before a decision was made.";
+            default -> "This application is still pending review. You can withdraw it before the module organiser records a decision.";
         });
+        withdrawButton.setEnabled("PENDING".equalsIgnoreCase(application.status()));
+    }
+
+    private void withdrawSelectedApplication() {
+        int selectedRow = applicationTable.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= currentApplications.size()) {
+            JOptionPane.showMessageDialog(this, "Please select a pending application first.");
+            return;
+        }
+        TaApplicationSummary application = currentApplications.get(selectedRow);
+        if (!"PENDING".equalsIgnoreCase(application.status())) {
+            JOptionPane.showMessageDialog(this, "Only pending applications can be withdrawn.");
+            return;
+        }
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "Withdraw this application?",
+                "Confirm Withdrawal",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (choice != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            applicationService.withdrawApplication(email, application.applicationId());
+            refreshApplications();
+            refreshDashboardSummary();
+            JOptionPane.showMessageDialog(this, "Application withdrawn.");
+        } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "Withdrawal failed: " + ex.getMessage());
+        }
     }
 
     private void refreshDashboardSummary() {
@@ -613,6 +817,10 @@ public class TaDashboardFrame extends JFrame {
         return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
     }
 
+    private String blankFallback(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
     private String formatTimestamp(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -625,11 +833,25 @@ public class TaDashboardFrame extends JFrame {
     }
 
     static String jobListItemText(JobPosting job) {
-        return "<html><b>" + job.title() + "</b><br/>"
-                + job.moduleCode() + " | Skills " + job.requiredSkills()
-                + "<br/>"
-                + job.hoursPerWeek() + " hrs/week | Deadline " + job.applicationDeadline()
-                + "</html>";
+        String typeLabel = job.isInvigilation() ? "Invigilation" : "TA";
+        StringBuilder builder = new StringBuilder("<html><b>")
+                .append(job.title())
+                .append("</b><br/>")
+                .append(job.moduleCode())
+                .append(" | ")
+                .append(typeLabel);
+        if (!job.requiredSkills().isBlank()) {
+            builder.append(" | Skills ").append(job.requiredSkills());
+        }
+        builder.append("<br/>")
+                .append(job.hoursPerWeek())
+                .append(" hrs/week | Deadline ")
+                .append(job.applicationDeadline());
+        if (job.isInvigilation() && job.examDate() != null) {
+            builder.append("<br/>Exam ").append(job.examDate()).append(" @ ").append(blankStatic(job.location()));
+        }
+        builder.append("</html>");
+        return builder.toString();
     }
 
     private void handleLogout() {
@@ -682,6 +904,29 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleTextArea(area);
         area.setEditable(false);
         return area;
+    }
+
+    private void bindLiveRefresh(JTextField field, Runnable action) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                action.run();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                action.run();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                action.run();
+            }
+        });
+    }
+
+    private static String blankStatic(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private static final class JobRenderer extends DefaultListCellRenderer {
