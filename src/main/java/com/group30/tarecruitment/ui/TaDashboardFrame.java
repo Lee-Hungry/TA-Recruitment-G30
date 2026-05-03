@@ -69,10 +69,12 @@ public class TaDashboardFrame extends JFrame {
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
+
     private final JLabel profileStatusValue = new JLabel();
     private final JLabel cvStatusValue = new JLabel();
     private final JLabel openJobsValue = new JLabel();
     private final JLabel applicationCountValue = new JLabel();
+
     private final JTextField fullNameField = new JTextField();
     private final JTextField studentIdField = new JTextField();
     private final JTextField contactEmailField = new JTextField();
@@ -81,6 +83,7 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea skillsArea = new JTextArea(4, 20);
     private final JTextArea availabilityArea = new JTextArea(4, 20);
     private final JLabel currentCvLabel = new JLabel("No CV uploaded");
+
     private final JTextField jobSearchField = new JTextField();
     private final JComboBox<String> moduleFilterBox = new JComboBox<>();
     private final JComboBox<String> skillFilterBox = new JComboBox<>();
@@ -93,6 +96,7 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea jobDescriptionArea = buildReadonlyTextArea();
     private final JTextArea jobSkillArea = buildReadonlyTextArea();
     private final JButton applyButton = UiTheme.primaryButton("Apply Now");
+
     private final DefaultTableModel applicationTableModel = new DefaultTableModel(
             new Object[]{"Job Title", "Module", "Applied", "Status"},
             0
@@ -108,6 +112,7 @@ public class TaDashboardFrame extends JFrame {
     private final JTextArea applicationNotesArea = buildReadonlyTextArea();
     private final JButton withdrawButton = UiTheme.secondaryButton("Withdraw Application");
     private final List<TaApplicationSummary> currentApplications = new ArrayList<>();
+
     private boolean returningToLogin;
     private boolean updatingJobFilters;
     private String selectedCvPath = "";
@@ -567,6 +572,29 @@ public class TaDashboardFrame extends JFrame {
         }
     }
 
+    private void refreshJobFilters() {
+        updatingJobFilters = true;
+        String selectedModule = selectedFilterValue(moduleFilterBox);
+        String selectedSkill = selectedFilterValue(skillFilterBox);
+
+        populateFilterBox(moduleFilterBox, jobPostingService.listOpenJobModules(), selectedModule);
+        populateFilterBox(skillFilterBox, jobPostingService.listOpenJobSkills(), selectedSkill);
+        updatingJobFilters = false;
+    }
+
+    private void populateFilterBox(JComboBox<String> comboBox, List<String> values, String selection) {
+        comboBox.removeAllItems();
+        comboBox.addItem(FILTER_ALL);
+        for (String value : values) {
+            comboBox.addItem(value);
+        }
+        if (selection != null && !selection.isBlank()) {
+            comboBox.setSelectedItem(selection);
+        } else {
+            comboBox.setSelectedItem(FILTER_ALL);
+        }
+    }
+
     private void refreshJobList() {
         String previousSelection = jobList.getSelectedValue() == null ? "" : jobList.getSelectedValue().jobId();
         jobListModel.clear();
@@ -591,29 +619,6 @@ public class TaDashboardFrame extends JFrame {
                     : "No open jobs are available right now.");
         }
         refreshDashboardSummary();
-    }
-
-    private void refreshJobFilters() {
-        updatingJobFilters = true;
-        String selectedModule = selectedFilterValue(moduleFilterBox);
-        String selectedSkill = selectedFilterValue(skillFilterBox);
-
-        populateFilterBox(moduleFilterBox, jobPostingService.listOpenJobModules(), selectedModule);
-        populateFilterBox(skillFilterBox, jobPostingService.listOpenJobSkills(), selectedSkill);
-        updatingJobFilters = false;
-    }
-
-    private void populateFilterBox(JComboBox<String> comboBox, List<String> values, String selection) {
-        comboBox.removeAllItems();
-        comboBox.addItem(FILTER_ALL);
-        for (String value : values) {
-            comboBox.addItem(value);
-        }
-        if (selection != null && !selection.isBlank()) {
-            comboBox.setSelectedItem(selection);
-        } else {
-            comboBox.setSelectedItem(FILTER_ALL);
-        }
     }
 
     private int findJobIndex(String jobId) {
@@ -817,10 +822,6 @@ public class TaDashboardFrame extends JFrame {
         return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
     }
 
-    private String blankFallback(String value) {
-        return value == null || value.isBlank() ? "-" : value;
-    }
-
     private String formatTimestamp(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -923,6 +924,10 @@ public class TaDashboardFrame extends JFrame {
                 action.run();
             }
         });
+    }
+
+    private String blankFallback(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private static String blankStatic(String value) {

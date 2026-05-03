@@ -53,6 +53,7 @@ public class AdminDashboardFrame extends JFrame {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
     private final JTextField searchField = new JTextField();
+
     private final DefaultTableModel workloadModel = new DefaultTableModel(
             new Object[]{"TA Name", "Student ID", "Assigned Modules", "Weekly Hours", "Overload Status"},
             0
@@ -69,6 +70,7 @@ public class AdminDashboardFrame extends JFrame {
     private final JLabel selectedTaLabel = new JLabel("Select a TA");
     private final JTextArea selectedTaDetail = buildReadonlyTextArea();
     private final List<TaWorkloadSummary> currentRows = new ArrayList<>();
+
     private final DefaultTableModel accountModel = new DefaultTableModel(
             new Object[]{"Name", "Email", "Role", "Status", "Student ID"},
             0
@@ -83,6 +85,7 @@ public class AdminDashboardFrame extends JFrame {
     private final JTextArea selectedAccountDetail = buildReadonlyTextArea();
     private final JButton deactivateButton = UiTheme.secondaryButton("Deactivate Account");
     private final List<ManagedUserAccount> currentAccounts = new ArrayList<>();
+
     private final JTextField postingTitleField = new JTextField();
     private final JTextField postingModuleField = new JTextField();
     private final JTextField postingHoursField = new JTextField();
@@ -131,6 +134,21 @@ public class AdminDashboardFrame extends JFrame {
             }
         });
 
+        styleFields();
+        installInteractions();
+
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(UiTheme.APP_BACKGROUND);
+        root.add(createSidebar(), BorderLayout.WEST);
+        root.add(createMainContent(), BorderLayout.CENTER);
+        setContentPane(root);
+
+        refreshWorkload();
+        refreshAccounts();
+        refreshInvigilationJobs();
+    }
+
+    private void styleFields() {
         UiTheme.styleInput(searchField);
         UiTheme.styleInput(postingTitleField);
         UiTheme.styleInput(postingModuleField);
@@ -142,6 +160,9 @@ public class AdminDashboardFrame extends JFrame {
         UiTheme.styleInput(invigilatorsField);
         UiTheme.styleTextArea(postingDescriptionArea);
         UiTheme.styleTextArea(postingSkillsArea);
+    }
+
+    private void installInteractions() {
         workloadTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         workloadTable.setDefaultRenderer(Object.class, new OverloadRenderer());
         workloadTable.getSelectionModel().addListSelectionListener(e -> {
@@ -150,6 +171,7 @@ public class AdminDashboardFrame extends JFrame {
                 showSelectedRow(row >= 0 && row < currentRows.size() ? currentRows.get(row) : null);
             }
         });
+
         accountTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         accountTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -157,19 +179,11 @@ public class AdminDashboardFrame extends JFrame {
                 showSelectedAccount(row >= 0 && row < currentAccounts.size() ? currentAccounts.get(row) : null);
             }
         });
+
         deactivateButton.addActionListener(e -> deactivateSelectedAccount());
         deactivateButton.setEnabled(false);
+
         bindLiveRefresh(searchField);
-
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(UiTheme.APP_BACKGROUND);
-        root.add(createSidebar(), BorderLayout.WEST);
-        root.add(createMainContent(), BorderLayout.CENTER);
-        setContentPane(root);
-
-        refreshWorkload();
-        refreshAccounts();
-        refreshInvigilationJobs();
     }
 
     private JPanel createSidebar() {
@@ -203,8 +217,8 @@ public class AdminDashboardFrame extends JFrame {
         JButton reportsButton = UiTheme.navButton("Reports");
         reportsButton.addActionListener(e -> JOptionPane.showMessageDialog(this, "Report export is out of scope for this release."));
         sidebar.add(reportsButton);
-        sidebar.add(Box.createVerticalGlue());
 
+        sidebar.add(Box.createVerticalGlue());
         JButton backButton = UiTheme.secondaryButton("Back to Login");
         backButton.addActionListener(e -> returnToLogin());
         sidebar.add(backButton);
@@ -216,6 +230,7 @@ public class AdminDashboardFrame extends JFrame {
         panel.setBackground(UiTheme.APP_BACKGROUND);
         panel.setBorder(UiTheme.pagePadding());
         panel.add(createTopBar(), BorderLayout.NORTH);
+
         contentPanel.setOpaque(false);
         contentPanel.add(createWorkloadCard(), CARD_WORKLOAD);
         contentPanel.add(createUserAccountsCard(), CARD_USERS);
@@ -227,7 +242,6 @@ public class AdminDashboardFrame extends JFrame {
     private JPanel createTopBar() {
         JPanel topBar = new JPanel(new BorderLayout(12, 12));
         topBar.setBackground(UiTheme.APP_BACKGROUND);
-
         topBar.add(searchField, BorderLayout.WEST);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
@@ -253,6 +267,58 @@ public class AdminDashboardFrame extends JFrame {
         center.add(createWorkloadSplit(), BorderLayout.CENTER);
         card.add(center, BorderLayout.CENTER);
         return card;
+    }
+
+    private JPanel createMetricStrip() {
+        JPanel metrics = new JPanel(new GridLayout(1, 3, 18, 18));
+        metrics.setOpaque(false);
+        metrics.add(buildMetricCard("Max Weekly Hours", thresholdValue));
+        metrics.add(buildMetricCard("Overloaded TAs", overloadedCountValue));
+        metrics.add(buildMetricCard("Tracked TAs", taCountValue));
+        return metrics;
+    }
+
+    private JPanel buildMetricCard(String title, JLabel valueLabel) {
+        JPanel card = new JPanel(new BorderLayout(8, 8));
+        card.setBackground(UiTheme.SIDEBAR_BACKGROUND);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)
+        ));
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        valueLabel.setFont(UiTheme.SECTION_FONT);
+        card.add(titleLabel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JSplitPane createWorkloadSplit() {
+        JScrollPane tablePane = new JScrollPane(workloadTable);
+        tablePane.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER_COLOR));
+
+        JPanel detailPanel = new JPanel(new BorderLayout(12, 12));
+        detailPanel.setBackground(UiTheme.PANEL_BACKGROUND);
+        detailPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)
+        ));
+
+        selectedTaLabel.setFont(UiTheme.SECTION_FONT);
+        detailPanel.add(selectedTaLabel, BorderLayout.NORTH);
+        detailPanel.add(new JScrollPane(selectedTaDetail), BorderLayout.CENTER);
+
+        JButton refreshButton = UiTheme.primaryButton("Refresh Data");
+        refreshButton.addActionListener(e -> refreshWorkload());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        footer.setOpaque(false);
+        footer.add(refreshButton);
+        detailPanel.add(footer, BorderLayout.SOUTH);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tablePane, detailPanel);
+        splitPane.setResizeWeight(0.7);
+        splitPane.setBorder(null);
+        return splitPane;
     }
 
     private JPanel createUserAccountsCard() {
@@ -352,65 +418,17 @@ public class AdminDashboardFrame extends JFrame {
         }
     }
 
-    private JPanel createMetricStrip() {
-        JPanel metrics = new JPanel(new GridLayout(1, 3, 18, 18));
-        metrics.setOpaque(false);
-        metrics.add(buildMetricCard("Max Weekly Hours", thresholdValue));
-        metrics.add(buildMetricCard("Overloaded TAs", overloadedCountValue));
-        metrics.add(buildMetricCard("Tracked TAs", taCountValue));
-        return metrics;
-    }
-
-    private JPanel buildMetricCard(String title, JLabel valueLabel) {
-        JPanel card = new JPanel(new BorderLayout(8, 8));
-        card.setBackground(UiTheme.SIDEBAR_BACKGROUND);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
-                BorderFactory.createEmptyBorder(14, 14, 14, 14)
-        ));
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
-        valueLabel.setFont(UiTheme.SECTION_FONT);
-        card.add(titleLabel, BorderLayout.NORTH);
-        card.add(valueLabel, BorderLayout.CENTER);
-        return card;
-    }
-
-    private JSplitPane createWorkloadSplit() {
-        JScrollPane tablePane = new JScrollPane(workloadTable);
-        tablePane.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER_COLOR));
-
-        JPanel detailPanel = new JPanel(new BorderLayout(12, 12));
-        detailPanel.setBackground(UiTheme.PANEL_BACKGROUND);
-        detailPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
-                BorderFactory.createEmptyBorder(14, 14, 14, 14)
-        ));
-
-        selectedTaLabel.setFont(UiTheme.SECTION_FONT);
-        detailPanel.add(selectedTaLabel, BorderLayout.NORTH);
-        detailPanel.add(new JScrollPane(selectedTaDetail), BorderLayout.CENTER);
-
-        JButton refreshButton = UiTheme.primaryButton("Refresh Data");
-        refreshButton.addActionListener(e -> refreshWorkload());
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        footer.setOpaque(false);
-        footer.add(refreshButton);
-        detailPanel.add(footer, BorderLayout.SOUTH);
-
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tablePane, detailPanel);
-        splitPane.setResizeWeight(0.7);
-        splitPane.setBorder(null);
-        return splitPane;
-    }
-
     private void refreshWorkload() {
+        String query = normalizeSearch(searchField.getText());
         currentRows.clear();
-        currentRows.addAll(workloadService.buildSummary());
         workloadModel.setRowCount(0);
 
         int overloadedCount = 0;
-        for (TaWorkloadSummary row : currentRows) {
+        for (TaWorkloadSummary row : workloadService.buildSummary()) {
+            if (!matchesWorkloadQuery(row, query)) {
+                continue;
+            }
+            currentRows.add(row);
             if (row.overloaded()) {
                 overloadedCount++;
             }
@@ -433,6 +451,33 @@ public class AdminDashboardFrame extends JFrame {
             showSelectedRow(null);
         }
         workloadTable.repaint();
+    }
+
+    private boolean matchesWorkloadQuery(TaWorkloadSummary row, String query) {
+        if (query.isBlank()) {
+            return true;
+        }
+        return containsIgnoreCase(row.fullName(), query)
+                || containsIgnoreCase(row.studentId(), query)
+                || containsIgnoreCase(row.assignedModules(), query)
+                || containsIgnoreCase(row.taEmail(), query);
+    }
+
+    private void showSelectedRow(TaWorkloadSummary row) {
+        if (row == null) {
+            selectedTaLabel.setText("Select a TA");
+            selectedTaDetail.setText("No TA workload data is available yet.");
+            return;
+        }
+
+        selectedTaLabel.setText(row.fullName());
+        selectedTaDetail.setText(
+                "Email: " + row.taEmail() + System.lineSeparator()
+                        + "Student ID: " + blankFallback(row.studentId()) + System.lineSeparator()
+                        + "Assigned Modules: " + blankFallback(row.assignedModules()) + System.lineSeparator()
+                        + "Total Weekly Hours: " + row.totalWeeklyHours() + System.lineSeparator()
+                        + "Threshold Status: " + (row.overloaded() ? "Above configured limit" : "Within configured limit")
+        );
     }
 
     private void refreshAccounts() {
@@ -572,23 +617,6 @@ public class AdminDashboardFrame extends JFrame {
 
     private boolean containsIgnoreCase(String source, String query) {
         return source != null && source.toLowerCase().contains(query);
-    }
-
-    private void showSelectedRow(TaWorkloadSummary row) {
-        if (row == null) {
-            selectedTaLabel.setText("Select a TA");
-            selectedTaDetail.setText("No TA workload data is available yet.");
-            return;
-        }
-
-        selectedTaLabel.setText(row.fullName());
-        selectedTaDetail.setText(
-                "Email: " + row.taEmail() + System.lineSeparator()
-                        + "Student ID: " + blankFallback(row.studentId()) + System.lineSeparator()
-                        + "Assigned Modules: " + blankFallback(row.assignedModules()) + System.lineSeparator()
-                        + "Total Weekly Hours: " + row.totalWeeklyHours() + System.lineSeparator()
-                        + "Threshold Status: " + (row.overloaded() ? "Above configured limit" : "Within configured limit")
-        );
     }
 
     private String blankFallback(String value) {
