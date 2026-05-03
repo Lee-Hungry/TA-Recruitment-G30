@@ -61,6 +61,7 @@ public class MoDashboardFrame extends JFrame {
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
+
     private final DefaultTableModel postingsModel = new DefaultTableModel(
             new Object[]{"Job Title", "Type", "Module", "Deadline", "Status"},
             0
@@ -81,9 +82,11 @@ public class MoDashboardFrame extends JFrame {
         }
     };
     private final JTable applicantsTable = new JTable(applicantsModel);
+
     private final JLabel totalPostingsValue = new JLabel();
     private final JLabel openPostingsValue = new JLabel();
     private final JLabel pendingApplicantsValue = new JLabel();
+
     private final JLabel postingFormTitle = new JLabel("Post a new job");
     private final JComboBox<String> jobTypeBox = new JComboBox<>(new String[]{"TA", "INVIGILATION"});
     private final JTextField jobTitleField = new JTextField();
@@ -99,6 +102,7 @@ public class MoDashboardFrame extends JFrame {
     private final JButton submitPostingButton = UiTheme.primaryButton("Publish Job");
     private final JButton cancelEditButton = UiTheme.secondaryButton("Cancel Edit");
     private final JPanel invigilationFieldsPanel = UiTheme.transparentPanel();
+
     private final JComboBox<JobPosting> applicantJobSelector = new JComboBox<>();
     private final JLabel applicantNameLabel = new JLabel("Select an applicant");
     private final JLabel applicantMetaLabel = new JLabel("No applicant selected.");
@@ -106,6 +110,7 @@ public class MoDashboardFrame extends JFrame {
     private final JTextArea applicantProfileArea = buildReadonlyTextArea();
     private final JButton acceptButton = UiTheme.primaryButton("Accept");
     private final JButton rejectButton = UiTheme.secondaryButton("Reject");
+
     private final List<JobPosting> currentPostings = new ArrayList<>();
     private final List<MoApplicantView> currentApplicants = new ArrayList<>();
     private boolean returningToLogin;
@@ -137,6 +142,45 @@ public class MoDashboardFrame extends JFrame {
             }
         });
 
+        styleFields();
+        installInteractions();
+
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(UiTheme.APP_BACKGROUND);
+        root.add(createSidebar(), BorderLayout.WEST);
+        root.add(createMainArea(), BorderLayout.CENTER);
+        setContentPane(root);
+
+        refreshMyPostings();
+        refreshApplicantJobOptions();
+        updatePostingModeUi();
+    }
+
+    public MoDashboardFrame() {
+        this(
+                "",
+                "",
+                new MoLoginService(
+                        new CsvMoAccountRepository(Path.of("data", "user_account.csv")),
+                        new CsvSessionRepository(Path.of("data", "mo_session.csv"))
+                ),
+                new JobPostingService(
+                        new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                        new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
+                        Clock.systemDefaultZone()
+                ),
+                new JobApplicationService(
+                        new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
+                        new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
+                        new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
+                        Clock.systemDefaultZone()
+                ),
+                () -> {
+                }
+        );
+    }
+
+    private void styleFields() {
         UiTheme.styleTextArea(descriptionArea);
         UiTheme.styleTextArea(skillsArea);
         UiTheme.styleInput(jobTypeBox);
@@ -149,7 +193,15 @@ public class MoDashboardFrame extends JFrame {
         UiTheme.styleInput(locationField);
         UiTheme.styleInput(invigilatorsField);
         UiTheme.styleInput(applicantJobSelector);
-        installPostingSelection();
+    }
+
+    private void installInteractions() {
+        postingsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        postingsTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                refreshPostingActionState();
+            }
+        });
 
         applicantJobSelector.setRenderer(new DefaultListCellRenderer() {
             @Override
@@ -183,36 +235,6 @@ public class MoDashboardFrame extends JFrame {
         cancelEditButton.addActionListener(e -> clearPostingForm());
         jobTypeBox.addActionListener(e -> updatePostingModeUi());
         setApplicantActionsEnabled(false);
-
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(UiTheme.APP_BACKGROUND);
-        root.add(createSidebar(), BorderLayout.WEST);
-        root.add(createMainArea(), BorderLayout.CENTER);
-        setContentPane(root);
-
-        refreshMyPostings();
-        refreshApplicantJobOptions();
-        updatePostingModeUi();
-    }
-
-    public MoDashboardFrame() {
-        this(
-                "",
-                "",
-                new MoLoginService(
-                        new CsvMoAccountRepository(Path.of("data", "user_account.csv")),
-                        new CsvSessionRepository(Path.of("data", "mo_session.csv"))
-                ),
-                new JobPostingService(new CsvJobPostingRepository(Path.of("data", "job_posting.csv")), Clock.systemDefaultZone()),
-                new JobApplicationService(
-                        new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
-                        new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
-                        new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
-                        Clock.systemDefaultZone()
-                ),
-                () -> {
-                }
-        );
     }
 
     private JPanel createSidebar() {
@@ -284,6 +306,7 @@ public class MoDashboardFrame extends JFrame {
     private JPanel createTopBar() {
         JPanel topBar = new JPanel(new BorderLayout(12, 12));
         topBar.setBackground(UiTheme.APP_BACKGROUND);
+
         JTextField searchField = new JTextField();
         UiTheme.styleInput(searchField);
         searchField.setText("Search postings, applicants...");
@@ -476,15 +499,6 @@ public class MoDashboardFrame extends JFrame {
         );
     }
 
-    private void installPostingSelection() {
-        postingsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        postingsTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                refreshPostingActionState();
-            }
-        });
-    }
-
     private void clearPostingForm() {
         editingJobId = "";
         jobTypeBox.setSelectedItem("TA");
@@ -507,6 +521,7 @@ public class MoDashboardFrame extends JFrame {
         postingFormTitle.setText(editingJobId.isBlank() ? "Post a new job" : "Edit selected job");
         submitPostingButton.setText(editingJobId.isBlank() ? "Publish Job" : "Save Changes");
         cancelEditButton.setVisible(!editingJobId.isBlank());
+        skillsArea.setEnabled(true);
         skillsArea.setToolTipText(invigilation
                 ? "Optional for invigilation jobs."
                 : "List required skills separated by commas.");
@@ -541,6 +556,7 @@ public class MoDashboardFrame extends JFrame {
         totalPostingsValue.setText(Integer.toString(postings.size()));
         openPostingsValue.setText(Integer.toString(openCount));
         pendingApplicantsValue.setText(Integer.toString(countPendingApplicants(postings)));
+
         if (!currentPostings.isEmpty()) {
             int selectedIndex = findPostingIndex(selectedJobId);
             postingsTable.setRowSelectionInterval(selectedIndex >= 0 ? selectedIndex : 0, selectedIndex >= 0 ? selectedIndex : 0);
@@ -688,7 +704,6 @@ public class MoDashboardFrame extends JFrame {
         try {
             jobPostingService.deletePosting(moEmail, posting.jobId());
             if (posting.jobId().equals(editingJobId)) {
-                editingJobId = "";
                 clearPostingForm();
             }
             refreshMyPostings();
@@ -722,7 +737,9 @@ public class MoDashboardFrame extends JFrame {
     }
 
     private void refreshPostingActionState() {
-        if (selectedPosting() == null && !currentPostings.isEmpty()) {
+        boolean hasSelection = selectedPosting() != null;
+        postingsTable.setEnabled(true);
+        if (!hasSelection && !currentPostings.isEmpty()) {
             postingsTable.setRowSelectionInterval(0, 0);
         }
     }
