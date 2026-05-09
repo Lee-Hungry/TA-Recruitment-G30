@@ -2,6 +2,7 @@ package com.group30.tarecruitment.ui;
 
 import com.group30.tarecruitment.admin.AdminUserAccountService;
 import com.group30.tarecruitment.admin.TaWorkloadService;
+import com.group30.tarecruitment.admin.WorkloadSuggestionService;
 import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthResult;
 import com.group30.tarecruitment.auth.AuthRole;
@@ -9,6 +10,7 @@ import com.group30.tarecruitment.auth.AuthService;
 import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.TaLoginResult;
 import com.group30.tarecruitment.login.TaLoginService;
+import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
 import com.group30.tarecruitment.profile.TaProfileService;
@@ -43,7 +45,9 @@ public class LoginFrame extends JFrame {
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
     private final TaWorkloadService workloadService;
+    private final WorkloadSuggestionService workloadSuggestionService;
     private final AdminUserAccountService userAccountService;
+    private final SkillMatchingService skillMatchingService;
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JComboBox<AuthRole> roleBox = new JComboBox<>(AuthRole.values());
@@ -57,7 +61,9 @@ public class LoginFrame extends JFrame {
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
             TaWorkloadService workloadService,
-            AdminUserAccountService userAccountService
+            WorkloadSuggestionService workloadSuggestionService,
+            AdminUserAccountService userAccountService,
+            SkillMatchingService skillMatchingService
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
@@ -67,7 +73,9 @@ public class LoginFrame extends JFrame {
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
         this.workloadService = workloadService;
+        this.workloadSuggestionService = workloadSuggestionService;
         this.userAccountService = userAccountService;
+        this.skillMatchingService = skillMatchingService;
 
         setTitle("TA Recruitment Login");
         setSize(1180, 720);
@@ -218,6 +226,7 @@ public class LoginFrame extends JFrame {
                 profileService,
                 jobPostingService,
                 applicationService,
+                skillMatchingService,
                 this::showAgain
         ).setVisible(true);
     }
@@ -240,6 +249,7 @@ public class LoginFrame extends JFrame {
                 moLoginService,
                 jobPostingService,
                 applicationService,
+                skillMatchingService,
                 this::showAgain
         ).setVisible(true);
     }
@@ -252,7 +262,14 @@ public class LoginFrame extends JFrame {
         }
 
         setVisible(false);
-        new AdminDashboardFrame(email, workloadService, userAccountService, jobPostingService, this::showAgain).setVisible(true);
+        new AdminDashboardFrame(
+                email,
+                workloadService,
+                workloadSuggestionService,
+                userAccountService,
+                jobPostingService,
+                this::showAgain
+        ).setVisible(true);
     }
 
     private void openRegistrationWindow() {

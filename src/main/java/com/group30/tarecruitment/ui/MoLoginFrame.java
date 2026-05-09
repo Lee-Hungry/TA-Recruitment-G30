@@ -4,6 +4,7 @@ import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
 import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPostingService;
+import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
@@ -66,6 +67,7 @@ public class MoLoginFrame extends JFrame {
                             new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
                             Clock.systemDefaultZone()
                     ),
+                    new SkillMatchingService(),
                     () -> {
                     }
             ).setVisible(true);

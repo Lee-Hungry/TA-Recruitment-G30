@@ -4,6 +4,8 @@ import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingDraft;
 import com.group30.tarecruitment.jobs.JobPostingService;
+import com.group30.tarecruitment.notifications.CsvNotificationRepository;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 import com.group30.tarecruitment.profile.TaProfileDraft;
 import com.group30.tarecruitment.profile.TaProfileService;
@@ -256,5 +258,55 @@ class JobApplicationServiceTest {
         );
 
         assertEquals("APPLICATION_WITHDRAW_NOT_ALLOWED", error.getMessage());
+    }
+
+    @Test
+    void shouldCreateNotificationsForSubmissionAndDecisionUpdates() throws Exception {
+        Path tempDir = Files.createTempDirectory("job-application-notification");
+        Path jobCsv = tempDir.resolve("job_posting.csv");
+        Path profileCsv = tempDir.resolve("ta_profile.csv");
+        Path applicationCsv = tempDir.resolve("job_application.csv");
+        Path notificationCsv = tempDir.resolve("notifications.csv");
+
+        JobPostingService jobPostingService = new JobPostingService(new CsvJobPostingRepository(jobCsv), fixedClock);
+        TaProfileService profileService = new TaProfileService(new CsvTaProfileRepository(profileCsv));
+        JobPosting posting = jobPostingService.postJob(new JobPostingDraft(
+                "mo@g30.local",
+                "Software Engineering TA",
+                "EBU6304",
+                "Support labs and marking",
+                "Java,JUnit,Scrum",
+                10,
+                LocalDate.of(2026, 4, 15)
+        ));
+        profileService.saveProfile("ta@g30.local", new TaProfileDraft(
+                "Alice Zhang",
+                "231222001",
+                "alice@g30.local",
+                "MSc Software Engineering",
+                "3.82",
+                "Java,Communication",
+                "Weekdays after 2pm",
+                ""
+        ));
+
+        NotificationService notificationService = new NotificationService(
+                new CsvNotificationRepository(notificationCsv),
+                fixedClock
+        );
+        JobApplicationService service = new JobApplicationService(
+                new CsvJobApplicationRepository(applicationCsv),
+                new CsvJobPostingRepository(jobCsv),
+                new CsvTaProfileRepository(profileCsv),
+                notificationService,
+                fixedClock
+        );
+
+        String applicationId = service.submitApplication("ta@g30.local", posting.jobId()).applicationId();
+        service.updateApplicationStatus("mo@g30.local", applicationId, "ACCEPTED");
+
+        assertEquals(1, notificationService.listNotificationsFor("mo@g30.local", "MO").size());
+        assertEquals(1, notificationService.listUnreadNotificationsFor("ta@g30.local", "TA").size());
+        assertTrue(notificationService.listUnreadNotificationsFor("ta@g30.local", "TA").getFirst().message().contains("accepted"));
     }
 }
