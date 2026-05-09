@@ -9,6 +9,7 @@ import com.group30.tarecruitment.auth.AuthService;
 import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.TaLoginResult;
 import com.group30.tarecruitment.login.TaLoginService;
+import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
 import com.group30.tarecruitment.profile.TaProfileService;
@@ -44,6 +45,7 @@ public class LoginFrame extends JFrame {
     private final JobApplicationService applicationService;
     private final TaWorkloadService workloadService;
     private final AdminUserAccountService userAccountService;
+    private final SkillMatchingService skillMatchingService;
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JComboBox<AuthRole> roleBox = new JComboBox<>(AuthRole.values());
@@ -57,7 +59,8 @@ public class LoginFrame extends JFrame {
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
             TaWorkloadService workloadService,
-            AdminUserAccountService userAccountService
+            AdminUserAccountService userAccountService,
+            SkillMatchingService skillMatchingService
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
@@ -68,6 +71,7 @@ public class LoginFrame extends JFrame {
         this.applicationService = applicationService;
         this.workloadService = workloadService;
         this.userAccountService = userAccountService;
+        this.skillMatchingService = skillMatchingService;
 
         setTitle("TA Recruitment Login");
         setSize(1180, 720);
@@ -240,6 +244,7 @@ public class LoginFrame extends JFrame {
                 moLoginService,
                 jobPostingService,
                 applicationService,
+                skillMatchingService,
                 this::showAgain
         ).setVisible(true);
     }
