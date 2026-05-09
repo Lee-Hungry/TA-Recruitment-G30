@@ -4,6 +4,8 @@ import com.group30.tarecruitment.admin.AdminUserAccountService;
 import com.group30.tarecruitment.admin.ManagedUserAccount;
 import com.group30.tarecruitment.admin.TaWorkloadService;
 import com.group30.tarecruitment.admin.TaWorkloadSummary;
+import com.group30.tarecruitment.admin.WorkloadSuggestion;
+import com.group30.tarecruitment.admin.WorkloadSuggestionService;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingDraft;
 import com.group30.tarecruitment.jobs.JobPostingService;
@@ -12,6 +14,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -37,7 +40,9 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class AdminDashboardFrame extends JFrame {
 
@@ -47,6 +52,7 @@ public class AdminDashboardFrame extends JFrame {
 
     private final String adminEmail;
     private final TaWorkloadService workloadService;
+    private final WorkloadSuggestionService workloadSuggestionService;
     private final AdminUserAccountService userAccountService;
     private final JobPostingService jobPostingService;
     private final Runnable showLoginFrame;
@@ -69,7 +75,13 @@ public class AdminDashboardFrame extends JFrame {
     private final JLabel taCountValue = new JLabel();
     private final JLabel selectedTaLabel = new JLabel("Select a TA");
     private final JTextArea selectedTaDetail = buildReadonlyTextArea();
+    private final JTextArea workloadSuggestionArea = buildReadonlyTextArea();
     private final List<TaWorkloadSummary> currentRows = new ArrayList<>();
+    private final JComboBox<WorkloadSuggestion> suggestionSelector = new JComboBox<>();
+    private final JButton dismissSuggestionButton = UiTheme.secondaryButton("Dismiss");
+    private final JButton focusSuggestionButton = UiTheme.primaryButton("Focus TA");
+    private final List<WorkloadSuggestion> currentSuggestions = new ArrayList<>();
+    private final Set<String> dismissedSuggestionKeys = new HashSet<>();
 
     private final DefaultTableModel accountModel = new DefaultTableModel(
             new Object[]{"Name", "Email", "Role", "Status", "Student ID"},
@@ -113,12 +125,14 @@ public class AdminDashboardFrame extends JFrame {
     public AdminDashboardFrame(
             String adminEmail,
             TaWorkloadService workloadService,
+            WorkloadSuggestionService workloadSuggestionService,
             AdminUserAccountService userAccountService,
             JobPostingService jobPostingService,
             Runnable showLoginFrame
     ) {
         this.adminEmail = adminEmail == null ? "" : adminEmail.trim().toLowerCase();
         this.workloadService = workloadService;
+        this.workloadSuggestionService = workloadSuggestionService;
         this.userAccountService = userAccountService;
         this.jobPostingService = jobPostingService;
         this.showLoginFrame = showLoginFrame;
@@ -160,6 +174,10 @@ public class AdminDashboardFrame extends JFrame {
         UiTheme.styleInput(invigilatorsField);
         UiTheme.styleTextArea(postingDescriptionArea);
         UiTheme.styleTextArea(postingSkillsArea);
+        UiTheme.styleTextArea(workloadSuggestionArea);
+        workloadSuggestionArea.setEditable(false);
+        workloadSuggestionArea.setRows(10);
+        UiTheme.styleInput(suggestionSelector);
     }
 
     private void installInteractions() {
@@ -182,6 +200,9 @@ public class AdminDashboardFrame extends JFrame {
 
         deactivateButton.addActionListener(e -> deactivateSelectedAccount());
         deactivateButton.setEnabled(false);
+        suggestionSelector.addActionListener(e -> showSelectedSuggestion());
+        dismissSuggestionButton.addActionListener(e -> dismissSelectedSuggestion());
+        focusSuggestionButton.addActionListener(e -> focusSelectedSuggestionTa());
 
         bindLiveRefresh(searchField);
     }
@@ -297,6 +318,9 @@ public class AdminDashboardFrame extends JFrame {
         JScrollPane tablePane = new JScrollPane(workloadTable);
         tablePane.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER_COLOR));
 
+        JPanel sidePanel = new JPanel(new GridLayout(2, 1, 12, 12));
+        sidePanel.setOpaque(false);
+
         JPanel detailPanel = new JPanel(new BorderLayout(12, 12));
         detailPanel.setBackground(UiTheme.PANEL_BACKGROUND);
         detailPanel.setBorder(BorderFactory.createCompoundBorder(
@@ -315,7 +339,31 @@ public class AdminDashboardFrame extends JFrame {
         footer.add(refreshButton);
         detailPanel.add(footer, BorderLayout.SOUTH);
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tablePane, detailPanel);
+        JPanel suggestionPanel = new JPanel(new BorderLayout(12, 12));
+        suggestionPanel.setBackground(UiTheme.PANEL_BACKGROUND);
+        suggestionPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)
+        ));
+        JLabel suggestionTitle = new JLabel("AI Workload Balancing Suggestions");
+        suggestionTitle.setFont(UiTheme.SECTION_FONT);
+        JPanel suggestionHeader = new JPanel(new BorderLayout(8, 8));
+        suggestionHeader.setOpaque(false);
+        suggestionHeader.add(suggestionTitle, BorderLayout.WEST);
+        suggestionHeader.add(suggestionSelector, BorderLayout.CENTER);
+        suggestionPanel.add(suggestionHeader, BorderLayout.NORTH);
+        suggestionPanel.add(new JScrollPane(workloadSuggestionArea), BorderLayout.CENTER);
+
+        JPanel suggestionActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        suggestionActions.setOpaque(false);
+        suggestionActions.add(dismissSuggestionButton);
+        suggestionActions.add(focusSuggestionButton);
+        suggestionPanel.add(suggestionActions, BorderLayout.SOUTH);
+
+        sidePanel.add(detailPanel);
+        sidePanel.add(suggestionPanel);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tablePane, sidePanel);
         splitPane.setResizeWeight(0.7);
         splitPane.setBorder(null);
         return splitPane;
@@ -444,6 +492,7 @@ public class AdminDashboardFrame extends JFrame {
         thresholdValue.setText(Integer.toString(workloadService.maxWeeklyHours()));
         overloadedCountValue.setText(Integer.toString(overloadedCount));
         taCountValue.setText(Integer.toString(currentRows.size()));
+        refreshSuggestions();
 
         if (!currentRows.isEmpty()) {
             workloadTable.setRowSelectionInterval(0, 0);
@@ -692,6 +741,70 @@ public class AdminDashboardFrame extends JFrame {
         returningToLogin = true;
         dispose();
         showLoginFrame.run();
+    }
+
+    private void refreshSuggestions() {
+        List<WorkloadSuggestion> suggestions = workloadSuggestionService.buildSuggestions();
+        currentSuggestions.clear();
+        suggestionSelector.removeAllItems();
+        for (WorkloadSuggestion suggestion : suggestions) {
+            if (dismissedSuggestionKeys.contains(suggestionKey(suggestion))) {
+                continue;
+            }
+            currentSuggestions.add(suggestion);
+            suggestionSelector.addItem(suggestion);
+        }
+        if (!currentSuggestions.isEmpty()) {
+            suggestionSelector.setSelectedIndex(0);
+        } else {
+            workloadSuggestionArea.setText("No workload suggestions available.");
+        }
+        dismissSuggestionButton.setEnabled(!currentSuggestions.isEmpty());
+        focusSuggestionButton.setEnabled(!currentSuggestions.isEmpty() && currentSuggestions.stream().anyMatch(WorkloadSuggestion::actionable));
+    }
+
+    private void showSelectedSuggestion() {
+        WorkloadSuggestion suggestion = (WorkloadSuggestion) suggestionSelector.getSelectedItem();
+        if (suggestion == null) {
+            workloadSuggestionArea.setText("No workload suggestions available.");
+            dismissSuggestionButton.setEnabled(false);
+            focusSuggestionButton.setEnabled(false);
+            return;
+        }
+        workloadSuggestionArea.setText(
+                suggestion.title() + System.lineSeparator() + System.lineSeparator() + suggestion.detail()
+        );
+        dismissSuggestionButton.setEnabled(true);
+        focusSuggestionButton.setEnabled(suggestion.actionable() && !suggestion.overloadedTaEmail().isBlank());
+    }
+
+    private void dismissSelectedSuggestion() {
+        WorkloadSuggestion suggestion = (WorkloadSuggestion) suggestionSelector.getSelectedItem();
+        if (suggestion == null) {
+            return;
+        }
+        dismissedSuggestionKeys.add(suggestionKey(suggestion));
+        refreshSuggestions();
+    }
+
+    private void focusSelectedSuggestionTa() {
+        WorkloadSuggestion suggestion = (WorkloadSuggestion) suggestionSelector.getSelectedItem();
+        if (suggestion == null || suggestion.overloadedTaEmail().isBlank()) {
+            return;
+        }
+        showCard(CARD_WORKLOAD);
+        for (int i = 0; i < currentRows.size(); i++) {
+            if (currentRows.get(i).taEmail().equalsIgnoreCase(suggestion.overloadedTaEmail())) {
+                workloadTable.setRowSelectionInterval(i, i);
+                workloadTable.scrollRectToVisible(workloadTable.getCellRect(i, 0, true));
+                return;
+            }
+        }
+        JOptionPane.showMessageDialog(this, "The referenced TA is not visible in the current workload table.");
+    }
+
+    private String suggestionKey(WorkloadSuggestion suggestion) {
+        return suggestion.overloadedTaEmail() + "|" + suggestion.suggestedCandidateEmail() + "|" + suggestion.suggestedJobId() + "|" + suggestion.title();
     }
 
     private final class OverloadRenderer extends DefaultTableCellRenderer {
