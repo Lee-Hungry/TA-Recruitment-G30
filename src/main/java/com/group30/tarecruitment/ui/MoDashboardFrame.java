@@ -7,6 +7,8 @@ import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingDraft;
 import com.group30.tarecruitment.jobs.JobPostingService;
+import com.group30.tarecruitment.matching.SkillMatchResult;
+import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.CsvMoAccountRepository;
 import com.group30.tarecruitment.mo.CsvSessionRepository;
 import com.group30.tarecruitment.mo.MoLoginService;
@@ -29,6 +31,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Component;
@@ -44,7 +47,10 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MoDashboardFrame extends JFrame {
 
@@ -58,6 +64,7 @@ public class MoDashboardFrame extends JFrame {
     private final MoLoginService loginService;
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
+    private final SkillMatchingService skillMatchingService;
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
@@ -73,7 +80,7 @@ public class MoDashboardFrame extends JFrame {
     };
     private final JTable postingsTable = new JTable(postingsModel);
     private final DefaultTableModel applicantsModel = new DefaultTableModel(
-            new Object[]{"Applicant", "Student ID", "Skills", "Applied", "Status"},
+            new Object[]{"Applicant", "Student ID", "AI Match Score", "Applied", "Status"},
             0
     ) {
         @Override
@@ -82,6 +89,7 @@ public class MoDashboardFrame extends JFrame {
         }
     };
     private final JTable applicantsTable = new JTable(applicantsModel);
+    private final TableRowSorter<DefaultTableModel> applicantsSorter = new TableRowSorter<>(applicantsModel);
 
     private final JLabel totalPostingsValue = new JLabel();
     private final JLabel openPostingsValue = new JLabel();
@@ -107,12 +115,17 @@ public class MoDashboardFrame extends JFrame {
     private final JLabel applicantNameLabel = new JLabel("Select an applicant");
     private final JLabel applicantMetaLabel = new JLabel("No applicant selected.");
     private final JLabel applicantCvLabel = new JLabel("CV path: -");
+    private final JLabel applicantMatchScoreLabel = UiTheme.tagLabel("0% match", UiTheme.WARNING, UiTheme.WARNING_SOFT);
     private final JTextArea applicantProfileArea = buildReadonlyTextArea();
+    private final JTextArea applicantRecommendationArea = buildReadonlyTextArea();
+    private final JPanel matchedSkillsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+    private final JPanel missingSkillsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
     private final JButton acceptButton = UiTheme.primaryButton("Accept");
     private final JButton rejectButton = UiTheme.secondaryButton("Reject");
 
     private final List<JobPosting> currentPostings = new ArrayList<>();
     private final List<MoApplicantView> currentApplicants = new ArrayList<>();
+    private final Map<String, SkillMatchResult> currentApplicantMatches = new LinkedHashMap<>();
     private boolean returningToLogin;
     private String editingJobId = "";
 
@@ -122,6 +135,7 @@ public class MoDashboardFrame extends JFrame {
             MoLoginService loginService,
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
+            SkillMatchingService skillMatchingService,
             Runnable showLoginFrame
     ) {
         this.moEmail = moEmail == null ? "" : moEmail.trim().toLowerCase();
@@ -129,6 +143,7 @@ public class MoDashboardFrame extends JFrame {
         this.loginService = loginService;
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
+        this.skillMatchingService = skillMatchingService;
         this.showLoginFrame = showLoginFrame;
 
         setTitle("MO Dashboard");
@@ -175,6 +190,7 @@ public class MoDashboardFrame extends JFrame {
                         new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
                         Clock.systemDefaultZone()
                 ),
+                new SkillMatchingService(),
                 () -> {
                 }
         );
@@ -183,6 +199,7 @@ public class MoDashboardFrame extends JFrame {
     private void styleFields() {
         UiTheme.styleTextArea(descriptionArea);
         UiTheme.styleTextArea(skillsArea);
+        UiTheme.styleTextArea(applicantRecommendationArea);
         UiTheme.styleInput(jobTypeBox);
         UiTheme.styleInput(jobTitleField);
         UiTheme.styleInput(moduleCodeField);
@@ -193,6 +210,12 @@ public class MoDashboardFrame extends JFrame {
         UiTheme.styleInput(locationField);
         UiTheme.styleInput(invigilatorsField);
         UiTheme.styleInput(applicantJobSelector);
+        applicantRecommendationArea.setEditable(false);
+        applicantRecommendationArea.setRows(4);
+        matchedSkillsPanel.setOpaque(false);
+        missingSkillsPanel.setOpaque(false);
+        applicantsSorter.setComparator(2, Comparator.comparingInt(this::parsePercentValue));
+        applicantsTable.setRowSorter(applicantsSorter);
     }
 
     private void installInteractions() {
@@ -225,7 +248,8 @@ public class MoDashboardFrame extends JFrame {
         applicantsTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 int row = applicantsTable.getSelectedRow();
-                showSelectedApplicant(row >= 0 && row < currentApplicants.size() ? currentApplicants.get(row) : null);
+                int modelRow = row < 0 ? -1 : applicantsTable.convertRowIndexToModel(row);
+                showSelectedApplicant(modelRow >= 0 && modelRow < currentApplicants.size() ? currentApplicants.get(modelRow) : null);
             }
         });
 
@@ -442,8 +466,7 @@ public class MoDashboardFrame extends JFrame {
         JPanel detailBody = new JPanel(new BorderLayout(8, 8));
         detailBody.setOpaque(false);
         detailBody.add(applicantMetaLabel, BorderLayout.NORTH);
-        detailBody.add(new JScrollPane(applicantProfileArea), BorderLayout.CENTER);
-        detailBody.add(applicantCvLabel, BorderLayout.SOUTH);
+        detailBody.add(createApplicantDetailBody(), BorderLayout.CENTER);
         right.add(detailBody, BorderLayout.CENTER);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
@@ -460,6 +483,55 @@ public class MoDashboardFrame extends JFrame {
         wrapper.setOpaque(false);
         wrapper.add(splitPane, BorderLayout.CENTER);
         return wrapper;
+    }
+
+    private JPanel createApplicantDetailBody() {
+        JPanel body = new JPanel(new BorderLayout(10, 10));
+        body.setOpaque(false);
+        body.add(new JScrollPane(applicantProfileArea), BorderLayout.NORTH);
+
+        JPanel analysisCard = new JPanel(new BorderLayout(8, 8));
+        analysisCard.setBackground(UiTheme.SIDEBAR_BACKGROUND);
+        analysisCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(12, 12, 12, 12)
+        ));
+
+        JPanel header = new JPanel(new BorderLayout(8, 8));
+        header.setOpaque(false);
+        JLabel title = new JLabel("AI Match Review");
+        title.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        header.add(title, BorderLayout.WEST);
+        header.add(applicantMatchScoreLabel, BorderLayout.EAST);
+        analysisCard.add(header, BorderLayout.NORTH);
+
+        JPanel content = new JPanel();
+        content.setOpaque(false);
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.add(applicantCvLabel);
+        content.add(Box.createVerticalStrut(10));
+        content.add(buildSkillGroup("Matched Skills", matchedSkillsPanel));
+        content.add(Box.createVerticalStrut(10));
+        content.add(buildSkillGroup("Missing Skills", missingSkillsPanel));
+        content.add(Box.createVerticalStrut(10));
+        content.add(new JScrollPane(applicantRecommendationArea));
+        analysisCard.add(content, BorderLayout.CENTER);
+
+        body.add(analysisCard, BorderLayout.CENTER);
+        return body;
+    }
+
+    private JPanel buildSkillGroup(String title, JPanel tagPanel) {
+        JPanel group = UiTheme.transparentPanel();
+        group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
+        JLabel label = new JLabel(title);
+        label.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        label.setAlignmentX(LEFT_ALIGNMENT);
+        tagPanel.setAlignmentX(LEFT_ALIGNMENT);
+        group.add(label);
+        group.add(Box.createVerticalStrut(4));
+        group.add(tagPanel);
+        return group;
     }
 
     private void savePosting() {
@@ -595,22 +667,32 @@ public class MoDashboardFrame extends JFrame {
         JobPosting selectedJob = (JobPosting) applicantJobSelector.getSelectedItem();
         applicantsModel.setRowCount(0);
         currentApplicants.clear();
+        currentApplicantMatches.clear();
         if (selectedJob == null) {
             showSelectedApplicant(null);
             return;
         }
 
-        currentApplicants.addAll(applicationService.listApplicantsForJob(moEmail, selectedJob.jobId()));
+        List<MoApplicantView> applicants = new ArrayList<>(applicationService.listApplicantsForJob(moEmail, selectedJob.jobId()));
+        currentApplicantMatches.putAll(skillMatchingService.analyzeApplicants(selectedJob, applicants));
+        applicants.sort((left, right) -> Integer.compare(matchScoreFor(right, selectedJob), matchScoreFor(left, selectedJob)));
+        currentApplicants.addAll(applicants);
         for (MoApplicantView applicant : currentApplicants) {
+            SkillMatchResult matchResult = currentApplicantMatches.getOrDefault(
+                    applicant.applicationId(),
+                    skillMatchingService.analyze(applicant.skills(), selectedJob.requiredSkills())
+            );
             applicantsModel.addRow(new Object[]{
                     applicant.fullName(),
                     applicant.studentId(),
-                    applicant.skills(),
+                    matchResult.matchScore() + "%",
                     formatTimestamp(applicant.appliedAt()),
                     applicant.status()
             });
         }
         if (!currentApplicants.isEmpty()) {
+            applicantsSorter.setSortKeys(List.of(new javax.swing.RowSorter.SortKey(2, javax.swing.SortOrder.DESCENDING)));
+            applicantsSorter.sort();
             applicantsTable.setRowSelectionInterval(0, 0);
         } else {
             showSelectedApplicant(null);
@@ -623,6 +705,7 @@ public class MoDashboardFrame extends JFrame {
             applicantMetaLabel.setText("No applicant selected.");
             applicantCvLabel.setText("CV path: -");
             applicantProfileArea.setText("Choose a posting and an applicant to review the TA profile, uploaded CV path, and latest application status.");
+            updateApplicantMatchUi(new SkillMatchResult(0, List.of(), List.of(), "Select an applicant to review the match analysis."));
             setApplicantActionsEnabled(false);
             return;
         }
@@ -643,17 +726,23 @@ public class MoDashboardFrame extends JFrame {
                         + "Availability" + System.lineSeparator()
                         + blankFallback(applicant.availability())
         );
+        SkillMatchResult matchResult = currentApplicantMatches.getOrDefault(
+                applicant.applicationId(),
+                skillMatchingService.analyze(applicant.skills(), currentSelectedJobSkills())
+        );
+        updateApplicantMatchUi(matchResult);
         setApplicantActionsEnabled(true);
     }
 
     private void reviewSelectedApplicant(String nextStatus) {
         int selectedRow = applicantsTable.getSelectedRow();
-        if (selectedRow < 0 || selectedRow >= currentApplicants.size()) {
+        int modelRow = selectedRow < 0 ? -1 : applicantsTable.convertRowIndexToModel(selectedRow);
+        if (modelRow < 0 || modelRow >= currentApplicants.size()) {
             JOptionPane.showMessageDialog(this, "Please select an applicant first.");
             return;
         }
 
-        MoApplicantView applicant = currentApplicants.get(selectedRow);
+        MoApplicantView applicant = currentApplicants.get(modelRow);
         try {
             applicationService.updateApplicationStatus(moEmail, applicant.applicationId(), nextStatus);
             refreshApplicantsForSelectedJob();
@@ -814,5 +903,71 @@ public class MoDashboardFrame extends JFrame {
         UiTheme.styleTextArea(area);
         area.setEditable(false);
         return area;
+    }
+
+    private int matchScoreFor(MoApplicantView applicant, JobPosting selectedJob) {
+        return currentApplicantMatches.getOrDefault(
+                applicant.applicationId(),
+                skillMatchingService.analyze(applicant.skills(), selectedJob.requiredSkills())
+        ).matchScore();
+    }
+
+    private String currentSelectedJobSkills() {
+        JobPosting selectedJob = (JobPosting) applicantJobSelector.getSelectedItem();
+        return selectedJob == null ? "" : selectedJob.requiredSkills();
+    }
+
+    private void updateApplicantMatchUi(SkillMatchResult matchResult) {
+        applicantMatchScoreLabel.setText(matchResult.matchScore() + "% match");
+        applyScoreStyle(applicantMatchScoreLabel, matchResult.matchScore());
+        refreshTagPanel(matchedSkillsPanel, matchResult.matchedSkills(), UiTheme.SUCCESS, UiTheme.SUCCESS_SOFT);
+        refreshTagPanel(missingSkillsPanel, matchResult.missingSkills(), UiTheme.WARNING, UiTheme.WARNING_SOFT);
+        applicantRecommendationArea.setText(matchResult.recommendation());
+    }
+
+    private void applyScoreStyle(JLabel label, int score) {
+        java.awt.Color foreground;
+        java.awt.Color background;
+        if (score >= 80) {
+            foreground = UiTheme.SUCCESS;
+            background = UiTheme.SUCCESS_SOFT;
+        } else if (score >= 50) {
+            foreground = UiTheme.WARNING;
+            background = UiTheme.WARNING_SOFT;
+        } else {
+            foreground = UiTheme.DANGER;
+            background = UiTheme.DANGER_SOFT;
+        }
+        label.setForeground(foreground);
+        label.setBackground(background);
+        label.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(background.darker(), 1, true),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)
+        ));
+    }
+
+    private void refreshTagPanel(JPanel panel, List<String> items, java.awt.Color foreground, java.awt.Color background) {
+        panel.removeAll();
+        if (items.isEmpty()) {
+            panel.add(UiTheme.tagLabel("None", foreground, background));
+        } else {
+            for (String item : items) {
+                panel.add(UiTheme.tagLabel(item, foreground, background));
+            }
+        }
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    private int parsePercentValue(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        String text = value.toString().replace("%", "").trim();
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 }
