@@ -12,6 +12,9 @@ import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.CsvMoAccountRepository;
 import com.group30.tarecruitment.mo.CsvSessionRepository;
 import com.group30.tarecruitment.mo.MoLoginService;
+import com.group30.tarecruitment.notifications.CsvNotificationRepository;
+import com.group30.tarecruitment.notifications.NotificationRecord;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 
 import javax.swing.BorderFactory;
@@ -47,10 +50,10 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
 
 public class MoDashboardFrame extends JFrame {
 
@@ -65,6 +68,7 @@ public class MoDashboardFrame extends JFrame {
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
     private final SkillMatchingService skillMatchingService;
+    private final NotificationService notificationService;
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
@@ -120,6 +124,7 @@ public class MoDashboardFrame extends JFrame {
     private final JTextArea applicantRecommendationArea = buildReadonlyTextArea();
     private final JPanel matchedSkillsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
     private final JPanel missingSkillsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+    private final JButton notificationsButton = UiTheme.subtleButton("Notifications");
     private final JButton acceptButton = UiTheme.primaryButton("Accept");
     private final JButton rejectButton = UiTheme.secondaryButton("Reject");
 
@@ -136,6 +141,7 @@ public class MoDashboardFrame extends JFrame {
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
             SkillMatchingService skillMatchingService,
+            NotificationService notificationService,
             Runnable showLoginFrame
     ) {
         this.moEmail = moEmail == null ? "" : moEmail.trim().toLowerCase();
@@ -144,6 +150,7 @@ public class MoDashboardFrame extends JFrame {
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
         this.skillMatchingService = skillMatchingService;
+        this.notificationService = notificationService;
         this.showLoginFrame = showLoginFrame;
 
         setTitle("MO Dashboard");
@@ -168,6 +175,7 @@ public class MoDashboardFrame extends JFrame {
 
         refreshMyPostings();
         refreshApplicantJobOptions();
+        refreshNotificationButton();
         updatePostingModeUi();
     }
 
@@ -188,9 +196,17 @@ public class MoDashboardFrame extends JFrame {
                         new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
                         new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
                         new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
+                        new NotificationService(
+                                new CsvNotificationRepository(Path.of("data", "notifications.csv")),
+                                Clock.systemDefaultZone()
+                        ),
                         Clock.systemDefaultZone()
                 ),
                 new SkillMatchingService(),
+                new NotificationService(
+                        new CsvNotificationRepository(Path.of("data", "notifications.csv")),
+                        Clock.systemDefaultZone()
+                ),
                 () -> {
                 }
         );
@@ -258,6 +274,7 @@ public class MoDashboardFrame extends JFrame {
         submitPostingButton.addActionListener(e -> savePosting());
         cancelEditButton.addActionListener(e -> clearPostingForm());
         jobTypeBox.addActionListener(e -> updatePostingModeUi());
+        notificationsButton.addActionListener(e -> showNotificationsDialog());
         setApplicantActionsEnabled(false);
     }
 
@@ -338,6 +355,7 @@ public class MoDashboardFrame extends JFrame {
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
+        right.add(notificationsButton);
         right.add(new JLabel("MO User"));
         right.add(new JLabel(moEmail.isBlank() ? "mo@g30.local" : moEmail));
         topBar.add(right, BorderLayout.EAST);
@@ -696,7 +714,6 @@ public class MoDashboardFrame extends JFrame {
             applicantsTable.setRowSelectionInterval(0, 0);
         } else {
             showSelectedApplicant(null);
-            applicantRecommendationArea.setText("No pending applicants are available for AI review on this posting.");
         }
     }
 
@@ -748,6 +765,7 @@ public class MoDashboardFrame extends JFrame {
             applicationService.updateApplicationStatus(moEmail, applicant.applicationId(), nextStatus);
             refreshApplicantsForSelectedJob();
             refreshMyPostings();
+            refreshNotificationButton();
             JOptionPane.showMessageDialog(this, "Application updated to " + nextStatus + ".");
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, "Decision failed: " + ex.getMessage());
@@ -958,6 +976,44 @@ public class MoDashboardFrame extends JFrame {
         }
         panel.revalidate();
         panel.repaint();
+    }
+
+    private void showNotificationsDialog() {
+        if (notificationService == null) {
+            JOptionPane.showMessageDialog(this, "Notifications are not available.");
+            return;
+        }
+        List<NotificationRecord> notifications = notificationService.listNotificationsFor(moEmail, "MO");
+        JTextArea area = buildReadonlyTextArea();
+        area.setRows(12);
+        if (notifications.isEmpty()) {
+            area.setText("No notifications yet.");
+        } else {
+            StringBuilder builder = new StringBuilder();
+            for (NotificationRecord notification : notifications) {
+                builder.append(notification.isRead() ? "[Read] " : "[New] ")
+                        .append(notification.title())
+                        .append(System.lineSeparator())
+                        .append(notification.message())
+                        .append(System.lineSeparator())
+                        .append(formatTimestamp(notification.createdAt()))
+                        .append(System.lineSeparator())
+                        .append(System.lineSeparator());
+            }
+            area.setText(builder.toString().trim());
+        }
+        JScrollPane pane = new JScrollPane(area);
+        pane.setPreferredSize(new Dimension(520, 280));
+        JOptionPane.showMessageDialog(this, pane, "Notifications", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void refreshNotificationButton() {
+        if (notificationService == null) {
+            notificationsButton.setText("Notifications");
+            return;
+        }
+        int count = notificationService.listNotificationsFor(moEmail, "MO").size();
+        notificationsButton.setText("Notifications (" + count + ")");
     }
 
     private int parsePercentValue(Object value) {

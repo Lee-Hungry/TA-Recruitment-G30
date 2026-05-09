@@ -13,6 +13,7 @@ import com.group30.tarecruitment.login.TaLoginService;
 import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.TaProfileService;
 import com.group30.tarecruitment.registration.TaRegistrationService;
 
@@ -48,6 +49,7 @@ public class LoginFrame extends JFrame {
     private final WorkloadSuggestionService workloadSuggestionService;
     private final AdminUserAccountService userAccountService;
     private final SkillMatchingService skillMatchingService;
+    private final NotificationService notificationService;
     private final JTextField emailField = new JTextField();
     private final JPasswordField passwordField = new JPasswordField();
     private final JComboBox<AuthRole> roleBox = new JComboBox<>(AuthRole.values());
@@ -63,7 +65,8 @@ public class LoginFrame extends JFrame {
             TaWorkloadService workloadService,
             WorkloadSuggestionService workloadSuggestionService,
             AdminUserAccountService userAccountService,
-            SkillMatchingService skillMatchingService
+            SkillMatchingService skillMatchingService,
+            NotificationService notificationService
     ) {
         this.authService = authService;
         this.registrationService = registrationService;
@@ -76,6 +79,7 @@ public class LoginFrame extends JFrame {
         this.workloadSuggestionService = workloadSuggestionService;
         this.userAccountService = userAccountService;
         this.skillMatchingService = skillMatchingService;
+        this.notificationService = notificationService;
 
         setTitle("TA Recruitment Login");
         setSize(1180, 720);
@@ -227,6 +231,7 @@ public class LoginFrame extends JFrame {
                 jobPostingService,
                 applicationService,
                 skillMatchingService,
+                notificationService,
                 this::showAgain
         ).setVisible(true);
     }
@@ -250,6 +255,7 @@ public class LoginFrame extends JFrame {
                 jobPostingService,
                 applicationService,
                 skillMatchingService,
+                notificationService,
                 this::showAgain
         ).setVisible(true);
     }

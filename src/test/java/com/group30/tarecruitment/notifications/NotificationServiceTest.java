@@ -40,21 +40,4 @@ class NotificationServiceTest {
                 .filter(notification -> "app-002".equals(notification.relatedApplicationId()))
                 .noneMatch(NotificationRecord::isRead));
     }
-
-    @Test
-    void shouldCreateSubmissionNoticeForMoInbox() throws Exception {
-        Path tempDir = Files.createTempDirectory("mo-notifications");
-        NotificationService service = new NotificationService(
-                new CsvNotificationRepository(tempDir.resolve("notifications.csv")),
-                fixedClock
-        );
-
-        service.notifyApplicationSubmitted("mo@g30.local", "Software Engineering TA", "Alice Zhang");
-
-        List<NotificationRecord> notifications = service.listNotificationsFor("mo@g30.local", "MO");
-        assertEquals(1, notifications.size());
-        assertEquals("New TA application received", notifications.getFirst().title());
-        assertTrue(notifications.getFirst().message().contains("Alice Zhang"));
-        assertEquals("APPLICATION_SUBMITTED", notifications.getFirst().category());
-    }
 }

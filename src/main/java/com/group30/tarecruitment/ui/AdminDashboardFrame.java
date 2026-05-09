@@ -73,6 +73,7 @@ public class AdminDashboardFrame extends JFrame {
     private final JLabel thresholdValue = new JLabel();
     private final JLabel overloadedCountValue = new JLabel();
     private final JLabel taCountValue = new JLabel();
+    private final JButton notificationsButton = UiTheme.subtleButton("Notifications");
     private final JLabel selectedTaLabel = new JLabel("Select a TA");
     private final JTextArea selectedTaDetail = buildReadonlyTextArea();
     private final JTextArea workloadSuggestionArea = buildReadonlyTextArea();
@@ -200,6 +201,7 @@ public class AdminDashboardFrame extends JFrame {
 
         deactivateButton.addActionListener(e -> deactivateSelectedAccount());
         deactivateButton.setEnabled(false);
+        notificationsButton.addActionListener(e -> showWorkloadNotificationDialog());
         suggestionSelector.addActionListener(e -> showSelectedSuggestion());
         dismissSuggestionButton.addActionListener(e -> dismissSelectedSuggestion());
         focusSuggestionButton.addActionListener(e -> focusSelectedSuggestionTa());
@@ -267,6 +269,7 @@ public class AdminDashboardFrame extends JFrame {
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
+        right.add(notificationsButton);
         right.add(new JLabel("Admin User"));
         right.add(new JLabel(adminEmail.isBlank() ? "admin@g30.local" : adminEmail));
         topBar.add(right, BorderLayout.EAST);
@@ -743,16 +746,43 @@ public class AdminDashboardFrame extends JFrame {
         showLoginFrame.run();
     }
 
+    private final class OverloadRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table,
+                Object value,
+                boolean isSelected,
+                boolean hasFocus,
+                int row,
+                int column
+        ) {
+            Component component = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            boolean overloaded = row >= 0 && row < currentRows.size() && currentRows.get(row).overloaded();
+            if (isSelected) {
+                component.setBackground(new Color(221, 234, 248));
+            } else if (overloaded) {
+                component.setBackground(new Color(255, 237, 237));
+            } else {
+                component.setBackground(Color.WHITE);
+            }
+            return component;
+        }
+    }
+
     private void refreshSuggestions() {
         List<WorkloadSuggestion> suggestions = workloadSuggestionService.buildSuggestions();
         currentSuggestions.clear();
         suggestionSelector.removeAllItems();
+        int actionableCount = 0;
         for (WorkloadSuggestion suggestion : suggestions) {
             if (dismissedSuggestionKeys.contains(suggestionKey(suggestion))) {
                 continue;
             }
             currentSuggestions.add(suggestion);
             suggestionSelector.addItem(suggestion);
+            if (suggestion.actionable()) {
+                actionableCount++;
+            }
         }
         if (!currentSuggestions.isEmpty()) {
             suggestionSelector.setSelectedIndex(0);
@@ -761,6 +791,32 @@ public class AdminDashboardFrame extends JFrame {
         }
         dismissSuggestionButton.setEnabled(!currentSuggestions.isEmpty());
         focusSuggestionButton.setEnabled(!currentSuggestions.isEmpty() && currentSuggestions.stream().anyMatch(WorkloadSuggestion::actionable));
+
+        notificationsButton.setText("Notifications (" + currentSuggestions.size() + ")");
+        notificationsButton.setToolTipText(actionableCount > 0
+                ? actionableCount + " actionable workload suggestion(s)"
+                : "Current workload overview");
+    }
+
+    private void showWorkloadNotificationDialog() {
+        StringBuilder builder = new StringBuilder();
+        for (WorkloadSuggestion suggestion : currentSuggestions) {
+            builder.append(suggestion.title())
+                    .append(System.lineSeparator())
+                    .append(suggestion.detail())
+                    .append(System.lineSeparator())
+                    .append(System.lineSeparator());
+        }
+        JScrollPane pane = new JScrollPane(buildReadonlyAreaCopy(builder.toString().trim()));
+        pane.setPreferredSize(new Dimension(540, 280));
+        JOptionPane.showMessageDialog(this, pane, "Workload Notifications", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private JTextArea buildReadonlyAreaCopy(String text) {
+        JTextArea area = buildReadonlyTextArea();
+        area.setRows(12);
+        area.setText(text.isBlank() ? "No workload suggestions available." : text);
+        return area;
     }
 
     private void showSelectedSuggestion() {
@@ -807,26 +863,4 @@ public class AdminDashboardFrame extends JFrame {
         return suggestion.overloadedTaEmail() + "|" + suggestion.suggestedCandidateEmail() + "|" + suggestion.suggestedJobId() + "|" + suggestion.title();
     }
 
-    private final class OverloadRenderer extends DefaultTableCellRenderer {
-        @Override
-        public Component getTableCellRendererComponent(
-                JTable table,
-                Object value,
-                boolean isSelected,
-                boolean hasFocus,
-                int row,
-                int column
-        ) {
-            Component component = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            boolean overloaded = row >= 0 && row < currentRows.size() && currentRows.get(row).overloaded();
-            if (isSelected) {
-                component.setBackground(new Color(221, 234, 248));
-            } else if (overloaded) {
-                component.setBackground(new Color(255, 237, 237));
-            } else {
-                component.setBackground(Color.WHITE);
-            }
-            return component;
-        }
-    }
 }
