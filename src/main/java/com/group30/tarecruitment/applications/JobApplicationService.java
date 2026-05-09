@@ -2,6 +2,7 @@ package com.group30.tarecruitment.applications;
 
 import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 import com.group30.tarecruitment.profile.TaProfile;
 
@@ -19,6 +20,7 @@ public class JobApplicationService {
     private final CsvJobApplicationRepository applicationRepository;
     private final CsvJobPostingRepository jobRepository;
     private final CsvTaProfileRepository profileRepository;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     public JobApplicationService(
@@ -27,9 +29,20 @@ public class JobApplicationService {
             CsvTaProfileRepository profileRepository,
             Clock clock
     ) {
+        this(applicationRepository, jobRepository, profileRepository, null, clock);
+    }
+
+    public JobApplicationService(
+            CsvJobApplicationRepository applicationRepository,
+            CsvJobPostingRepository jobRepository,
+            CsvTaProfileRepository profileRepository,
+            NotificationService notificationService,
+            Clock clock
+    ) {
         this.applicationRepository = applicationRepository;
         this.jobRepository = jobRepository;
         this.profileRepository = profileRepository;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -55,6 +68,11 @@ public class JobApplicationService {
                 now
         );
         applicationRepository.append(application);
+        if (notificationService != null) {
+            TaProfile profile = profileRepository.findByEmail(normalizedEmail).orElse(null);
+            String applicantLabel = profile == null || profile.fullName().isBlank() ? normalizedEmail : profile.fullName();
+            notificationService.notifyApplicationSubmitted(posting.postedByEmail(), posting.title(), applicantLabel);
+        }
         return application;
     }
 
@@ -120,6 +138,9 @@ public class JobApplicationService {
 
         JobApplication updated = current.withStatus(normalizedStatus, OffsetDateTime.now(clock).toString());
         applicationRepository.replace(updated);
+        if (notificationService != null && !current.status().equalsIgnoreCase(normalizedStatus)) {
+            notificationService.notifyApplicationStatusChanged(current.taEmail(), posting.title(), normalizedStatus, current.applicationId());
+        }
         return updated;
     }
 
