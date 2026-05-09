@@ -3,6 +3,7 @@ package com.group30.tarecruitment.ui;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -21,6 +22,12 @@ public final class UiTheme {
     public static final Color BORDER_COLOR = new Color(213, 220, 229);
     public static final Color ACCENT = new Color(154, 198, 240);
     public static final Color ACCENT_DARK = new Color(73, 126, 173);
+    public static final Color SUCCESS = new Color(79, 157, 105);
+    public static final Color SUCCESS_SOFT = new Color(230, 244, 234);
+    public static final Color WARNING = new Color(203, 128, 35);
+    public static final Color WARNING_SOFT = new Color(255, 244, 225);
+    public static final Color DANGER = new Color(194, 75, 75);
+    public static final Color DANGER_SOFT = new Color(252, 235, 235);
     public static final Font TITLE_FONT = new Font("SansSerif", Font.BOLD, 28);
     public static final Font SECTION_FONT = new Font("SansSerif", Font.BOLD, 18);
     public static final Font BODY_FONT = new Font("SansSerif", Font.PLAIN, 14);
@@ -107,5 +114,18 @@ public final class UiTheme {
     public static void setPanelBackground(JComponent component) {
         component.setOpaque(true);
         component.setBackground(PANEL_BACKGROUND);
+    }
+
+    public static JLabel tagLabel(String text, Color foreground, Color background) {
+        JLabel label = new JLabel(" " + text + " ");
+        label.setFont(BODY_FONT.deriveFont(Font.BOLD, 12f));
+        label.setForeground(foreground);
+        label.setOpaque(true);
+        label.setBackground(background);
+        label.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(background.darker(), 1, true),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)
+        ));
+        return label;
     }
 }

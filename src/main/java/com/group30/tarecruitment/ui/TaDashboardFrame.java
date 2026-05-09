@@ -7,6 +7,8 @@ import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPosting;
 import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.TaLoginService;
+import com.group30.tarecruitment.matching.SkillMatchResult;
+import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 import com.group30.tarecruitment.profile.TaProfile;
 import com.group30.tarecruitment.profile.TaProfileDraft;
@@ -37,6 +39,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -66,6 +69,7 @@ public class TaDashboardFrame extends JFrame {
     private final TaProfileService profileService;
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
+    private final SkillMatchingService skillMatchingService;
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
@@ -95,6 +99,10 @@ public class TaDashboardFrame extends JFrame {
     private final JLabel jobMetaLabel = new JLabel("No job selected.");
     private final JTextArea jobDescriptionArea = buildReadonlyTextArea();
     private final JTextArea jobSkillArea = buildReadonlyTextArea();
+    private final JLabel jobMatchScoreLabel = UiTheme.tagLabel("0% match", UiTheme.WARNING, UiTheme.WARNING_SOFT);
+    private final JPanel matchedSkillsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+    private final JPanel missingSkillsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+    private final JTextArea jobRecommendationArea = buildReadonlyTextArea();
     private final JButton applyButton = UiTheme.primaryButton("Apply Now");
 
     private final DefaultTableModel applicationTableModel = new DefaultTableModel(
@@ -124,6 +132,7 @@ public class TaDashboardFrame extends JFrame {
             TaProfileService profileService,
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
+            SkillMatchingService skillMatchingService,
             Runnable showLoginFrame
     ) {
         this.email = email == null ? "" : email.trim().toLowerCase();
@@ -132,6 +141,7 @@ public class TaDashboardFrame extends JFrame {
         this.profileService = profileService;
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
+        this.skillMatchingService = skillMatchingService;
         this.showLoginFrame = showLoginFrame;
 
         setTitle("TA Dashboard");
@@ -174,6 +184,7 @@ public class TaDashboardFrame extends JFrame {
                         new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
                         Clock.systemDefaultZone()
                 ),
+                new SkillMatchingService(),
                 showLoginFrame
         );
     }
@@ -182,8 +193,13 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleTextArea(skillsArea);
         UiTheme.styleTextArea(availabilityArea);
         UiTheme.styleTextArea(applicationNotesArea);
+        UiTheme.styleTextArea(jobRecommendationArea);
         applicationNotesArea.setEditable(false);
+        jobRecommendationArea.setEditable(false);
         currentCvLabel.setFont(UiTheme.BODY_FONT);
+        matchedSkillsPanel.setOpaque(false);
+        missingSkillsPanel.setOpaque(false);
+        jobRecommendationArea.setRows(4);
 
         UiTheme.styleInput(fullNameField);
         UiTheme.styleInput(studentIdField);
@@ -467,7 +483,11 @@ public class TaDashboardFrame extends JFrame {
         JLabel skillTitle = new JLabel("Required Skills / Notes");
         skillTitle.setFont(UiTheme.SECTION_FONT);
         skillCard.add(skillTitle, BorderLayout.NORTH);
-        skillCard.add(new JScrollPane(jobSkillArea), BorderLayout.CENTER);
+        JPanel analysisWrapper = new JPanel(new BorderLayout(8, 8));
+        analysisWrapper.setOpaque(false);
+        analysisWrapper.add(new JScrollPane(jobSkillArea), BorderLayout.NORTH);
+        analysisWrapper.add(createSkillGapCard(), BorderLayout.CENTER);
+        skillCard.add(analysisWrapper, BorderLayout.CENTER);
 
         details.add(descriptionCard);
         details.add(skillCard);
@@ -481,6 +501,47 @@ public class TaDashboardFrame extends JFrame {
         wrapper.setOpaque(false);
         wrapper.add(splitPane, BorderLayout.CENTER);
         return wrapper;
+    }
+
+    private JPanel createSkillGapCard() {
+        JPanel card = new JPanel(new BorderLayout(10, 10));
+        card.setBackground(UiTheme.SIDEBAR_BACKGROUND);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.BORDER_COLOR, 1, true),
+                BorderFactory.createEmptyBorder(14, 14, 14, 14)
+        ));
+
+        JPanel header = new JPanel(new BorderLayout(10, 10));
+        header.setOpaque(false);
+        JLabel title = new JLabel("AI Skill Gap Analysis");
+        title.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        header.add(title, BorderLayout.WEST);
+        header.add(jobMatchScoreLabel, BorderLayout.EAST);
+        card.add(header, BorderLayout.NORTH);
+
+        JPanel body = new JPanel();
+        body.setOpaque(false);
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.add(buildSkillGroup("Matched Skills", matchedSkillsPanel));
+        body.add(UiTheme.verticalGap(10));
+        body.add(buildSkillGroup("Missing Skills", missingSkillsPanel));
+        body.add(UiTheme.verticalGap(10));
+        body.add(new JScrollPane(jobRecommendationArea));
+        card.add(body, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel buildSkillGroup(String title, JPanel tagPanel) {
+        JPanel group = UiTheme.transparentPanel();
+        group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
+        JLabel label = new JLabel(title);
+        label.setFont(UiTheme.BODY_FONT.deriveFont(java.awt.Font.BOLD));
+        label.setAlignmentX(LEFT_ALIGNMENT);
+        tagPanel.setAlignmentX(LEFT_ALIGNMENT);
+        group.add(label);
+        group.add(Box.createVerticalStrut(4));
+        group.add(tagPanel);
+        return group;
     }
 
     private JPanel createApplicationsCard() {
@@ -530,6 +591,7 @@ public class TaDashboardFrame extends JFrame {
         availabilityArea.setText(profile.availability());
         selectedCvPath = profile.cvFilePath();
         updateCvLabel();
+        updateSelectedJobAnalysis();
     }
 
     private void saveProfile() {
@@ -544,6 +606,7 @@ public class TaDashboardFrame extends JFrame {
                     availabilityArea.getText(),
                     selectedCvPath
             ));
+            updateSelectedJobAnalysis();
             refreshDashboardSummary();
             JOptionPane.showMessageDialog(this, "Profile saved.");
         } catch (IllegalArgumentException ex) {
@@ -651,6 +714,7 @@ public class TaDashboardFrame extends JFrame {
             jobMetaLabel.setText("No open jobs available.");
             jobDescriptionArea.setText("");
             jobSkillArea.setText("");
+            updateSkillGapUi(new SkillMatchResult(0, List.of(), List.of(), "Select a job to compare its required skills with your saved profile."), true);
             applyButton.setEnabled(false);
             return;
         }
@@ -658,6 +722,7 @@ public class TaDashboardFrame extends JFrame {
         jobMetaLabel.setText(buildJobMeta(job));
         jobDescriptionArea.setText(buildJobDescription(job));
         jobSkillArea.setText(buildSkillNotes(job));
+        updateSkillGapUi(skillMatchingService.analyze(profileService.loadProfile(email), job), false);
         applyButton.setEnabled(true);
     }
 
@@ -801,6 +866,62 @@ public class TaDashboardFrame extends JFrame {
         cvStatusValue.setText(profile.cvFilePath().isBlank() ? "Not Uploaded" : "Uploaded");
         openJobsValue.setText(Integer.toString(jobPostingService.browseOpenJobs().size()));
         applicationCountValue.setText(Integer.toString(applicationService.listApplicationsForTa(email).size()));
+    }
+
+    private void updateSelectedJobAnalysis() {
+        showSelectedJob(jobList.getSelectedValue());
+    }
+
+    private void updateSkillGapUi(SkillMatchResult analysis, boolean emptyState) {
+        if (emptyState) {
+            jobMatchScoreLabel.setText("No analysis");
+            jobMatchScoreLabel.setForeground(UiTheme.WARNING);
+            jobMatchScoreLabel.setBackground(UiTheme.WARNING_SOFT);
+            jobRecommendationArea.setText(analysis.recommendation());
+            refreshTagPanel(matchedSkillsPanel, List.of(), UiTheme.SUCCESS, UiTheme.SUCCESS_SOFT);
+            refreshTagPanel(missingSkillsPanel, List.of(), UiTheme.WARNING, UiTheme.WARNING_SOFT);
+            return;
+        }
+
+        jobMatchScoreLabel.setText(analysis.matchScore() + "% match");
+        applyScoreStyle(jobMatchScoreLabel, analysis.matchScore());
+        refreshTagPanel(matchedSkillsPanel, analysis.matchedSkills(), UiTheme.SUCCESS, UiTheme.SUCCESS_SOFT);
+        refreshTagPanel(missingSkillsPanel, analysis.missingSkills(), UiTheme.WARNING, UiTheme.WARNING_SOFT);
+        jobRecommendationArea.setText(analysis.recommendation());
+    }
+
+    private void applyScoreStyle(JLabel label, int score) {
+        Color foreground;
+        Color background;
+        if (score >= 80) {
+            foreground = UiTheme.SUCCESS;
+            background = UiTheme.SUCCESS_SOFT;
+        } else if (score >= 50) {
+            foreground = UiTheme.WARNING;
+            background = UiTheme.WARNING_SOFT;
+        } else {
+            foreground = UiTheme.DANGER;
+            background = UiTheme.DANGER_SOFT;
+        }
+        label.setForeground(foreground);
+        label.setBackground(background);
+        label.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(background.darker(), 1, true),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)
+        ));
+    }
+
+    private void refreshTagPanel(JPanel panel, List<String> items, Color foreground, Color background) {
+        panel.removeAll();
+        if (items.isEmpty()) {
+            panel.add(UiTheme.tagLabel("None", foreground, background));
+        } else {
+            for (String item : items) {
+                panel.add(UiTheme.tagLabel(item, foreground, background));
+            }
+        }
+        panel.revalidate();
+        panel.repaint();
     }
 
     private boolean isProfileReady(TaProfile profile) {
