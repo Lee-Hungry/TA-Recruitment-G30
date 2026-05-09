@@ -3,9 +3,9 @@ package com.group30.tarecruitment.ui;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JLabel;
 import javax.swing.JTextArea;
 import javax.swing.border.Border;
 import java.awt.Color;
@@ -75,6 +75,15 @@ public final class UiTheme {
         button.setFont(BODY_FONT);
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        return button;
+    }
+
+    public static JButton subtleButton(String text) {
+        JButton button = new JButton(text);
+        button.setBackground(SIDEBAR_BACKGROUND);
+        button.setFont(BODY_FONT.deriveFont(Font.BOLD));
+        button.setFocusPainted(false);
+        button.setMargin(new Insets(8, 14, 8, 14));
         return button;
     }
 

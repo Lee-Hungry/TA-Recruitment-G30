@@ -3,6 +3,7 @@ package com.group30.tarecruitment;
 import com.group30.tarecruitment.admin.AdminUserAccountService;
 import com.group30.tarecruitment.admin.TaWorkloadService;
 import com.group30.tarecruitment.admin.WorkloadSettingsRepository;
+import com.group30.tarecruitment.admin.WorkloadSuggestionService;
 import com.group30.tarecruitment.applications.CsvJobApplicationRepository;
 import com.group30.tarecruitment.applications.JobApplicationService;
 import com.group30.tarecruitment.auth.AuthService;
@@ -12,9 +13,12 @@ import com.group30.tarecruitment.jobs.CsvJobPostingRepository;
 import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.CsvUserCredentialRepository;
 import com.group30.tarecruitment.login.TaLoginService;
+import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.CsvMoAccountRepository;
 import com.group30.tarecruitment.mo.CsvSessionRepository;
 import com.group30.tarecruitment.mo.MoLoginService;
+import com.group30.tarecruitment.notifications.CsvNotificationRepository;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 import com.group30.tarecruitment.profile.TaProfileService;
 import com.group30.tarecruitment.registration.CsvUserRepository;
@@ -35,12 +39,18 @@ public class AppLauncher {
             Path profileCsv = Path.of("data", "ta_profile.csv");
             Path jobCsv = Path.of("data", "job_posting.csv");
             Path applicationCsv = Path.of("data", "job_application.csv");
+            Path notificationCsv = Path.of("data", "notifications.csv");
             Path settingsFile = Path.of("data", "settings.properties");
 
             CsvUserAccountRepository userAccountRepository = new CsvUserAccountRepository(userCsv);
             CsvTaProfileRepository profileRepository = new CsvTaProfileRepository(profileCsv);
             CsvJobPostingRepository jobRepository = new CsvJobPostingRepository(jobCsv);
             CsvJobApplicationRepository applicationRepository = new CsvJobApplicationRepository(applicationCsv);
+            NotificationService notificationService = new NotificationService(
+                    new CsvNotificationRepository(notificationCsv),
+                    Clock.systemDefaultZone()
+            );
+            SkillMatchingService skillMatchingService = new SkillMatchingService();
 
             TaProfileService profileService = new TaProfileService(profileRepository);
             TaRegistrationService registrationService = new TaRegistrationService(
@@ -68,6 +78,7 @@ public class AppLauncher {
                     applicationRepository,
                     jobRepository,
                     profileRepository,
+                    notificationService,
                     Clock.systemDefaultZone()
             );
             TaWorkloadService workloadService = new TaWorkloadService(
@@ -82,6 +93,13 @@ public class AppLauncher {
                     profileRepository,
                     Clock.systemDefaultZone()
             );
+            WorkloadSuggestionService workloadSuggestionService = new WorkloadSuggestionService(
+                    workloadService,
+                    jobRepository,
+                    applicationRepository,
+                    profileRepository,
+                    skillMatchingService
+            );
 
             LoginFrame frame = new LoginFrame(
                     authService,
@@ -92,7 +110,10 @@ public class AppLauncher {
                     jobPostingService,
                     applicationService,
                     workloadService,
-                    userAccountService
+                    workloadSuggestionService,
+                    userAccountService,
+                    skillMatchingService,
+                    notificationService
             );
             frame.setVisible(true);
         });

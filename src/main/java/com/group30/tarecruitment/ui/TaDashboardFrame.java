@@ -9,6 +9,9 @@ import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.login.TaLoginService;
 import com.group30.tarecruitment.matching.SkillMatchResult;
 import com.group30.tarecruitment.matching.SkillMatchingService;
+import com.group30.tarecruitment.notifications.CsvNotificationRepository;
+import com.group30.tarecruitment.notifications.NotificationRecord;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 import com.group30.tarecruitment.profile.TaProfile;
 import com.group30.tarecruitment.profile.TaProfileDraft;
@@ -70,6 +73,7 @@ public class TaDashboardFrame extends JFrame {
     private final JobPostingService jobPostingService;
     private final JobApplicationService applicationService;
     private final SkillMatchingService skillMatchingService;
+    private final NotificationService notificationService;
     private final Runnable showLoginFrame;
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentPanel = new JPanel(cardLayout);
@@ -78,6 +82,9 @@ public class TaDashboardFrame extends JFrame {
     private final JLabel cvStatusValue = new JLabel();
     private final JLabel openJobsValue = new JLabel();
     private final JLabel applicationCountValue = new JLabel();
+    private final JLabel notificationCountValue = new JLabel();
+    private final JTextArea dashboardNotificationArea = buildReadonlyTextArea();
+    private final JButton notificationsButton = UiTheme.subtleButton("Notifications (0)");
 
     private final JTextField fullNameField = new JTextField();
     private final JTextField studentIdField = new JTextField();
@@ -133,6 +140,7 @@ public class TaDashboardFrame extends JFrame {
             JobPostingService jobPostingService,
             JobApplicationService applicationService,
             SkillMatchingService skillMatchingService,
+            NotificationService notificationService,
             Runnable showLoginFrame
     ) {
         this.email = email == null ? "" : email.trim().toLowerCase();
@@ -142,6 +150,7 @@ public class TaDashboardFrame extends JFrame {
         this.jobPostingService = jobPostingService;
         this.applicationService = applicationService;
         this.skillMatchingService = skillMatchingService;
+        this.notificationService = notificationService;
         this.showLoginFrame = showLoginFrame;
 
         setTitle("TA Dashboard");
@@ -182,9 +191,17 @@ public class TaDashboardFrame extends JFrame {
                         new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
                         new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
                         new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
+                        new NotificationService(
+                                new CsvNotificationRepository(Path.of("data", "notifications.csv")),
+                                Clock.systemDefaultZone()
+                        ),
                         Clock.systemDefaultZone()
                 ),
                 new SkillMatchingService(),
+                new NotificationService(
+                        new CsvNotificationRepository(Path.of("data", "notifications.csv")),
+                        Clock.systemDefaultZone()
+                ),
                 showLoginFrame
         );
     }
@@ -194,11 +211,14 @@ public class TaDashboardFrame extends JFrame {
         UiTheme.styleTextArea(availabilityArea);
         UiTheme.styleTextArea(applicationNotesArea);
         UiTheme.styleTextArea(jobRecommendationArea);
+        UiTheme.styleTextArea(dashboardNotificationArea);
         applicationNotesArea.setEditable(false);
         jobRecommendationArea.setEditable(false);
+        dashboardNotificationArea.setEditable(false);
         currentCvLabel.setFont(UiTheme.BODY_FONT);
         matchedSkillsPanel.setOpaque(false);
         missingSkillsPanel.setOpaque(false);
+        dashboardNotificationArea.setRows(5);
         jobRecommendationArea.setRows(4);
 
         UiTheme.styleInput(fullNameField);
@@ -250,6 +270,7 @@ public class TaDashboardFrame extends JFrame {
         });
         applyButton.addActionListener(e -> applyForSelectedJob());
         withdrawButton.addActionListener(e -> withdrawSelectedApplication());
+        notificationsButton.addActionListener(e -> showNotificationsDialog());
         withdrawButton.setEnabled(false);
     }
 
@@ -343,6 +364,7 @@ public class TaDashboardFrame extends JFrame {
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
         right.setOpaque(false);
+        right.add(notificationsButton);
         right.add(new JLabel("TA User"));
         right.add(new JLabel(email.isBlank() ? "ta@g30.local" : email));
         topBar.add(right, BorderLayout.EAST);
@@ -350,12 +372,39 @@ public class TaDashboardFrame extends JFrame {
     }
 
     private JPanel createHomeCard() {
-        JPanel card = new JPanel(new GridLayout(2, 2, 18, 18));
+        JPanel card = new JPanel(new BorderLayout(18, 18));
         card.setOpaque(false);
-        card.add(buildMetricCard("Profile Status", profileStatusValue));
-        card.add(buildMetricCard("CV Status", cvStatusValue));
-        card.add(buildMetricCard("Open Jobs", openJobsValue));
-        card.add(buildMetricCard("Applications", applicationCountValue));
+        JPanel metrics = new JPanel(new GridLayout(1, 5, 18, 18));
+        metrics.setOpaque(false);
+        metrics.add(buildMetricCard("Profile Status", profileStatusValue));
+        metrics.add(buildMetricCard("CV Status", cvStatusValue));
+        metrics.add(buildMetricCard("Open Jobs", openJobsValue));
+        metrics.add(buildMetricCard("Applications", applicationCountValue));
+        metrics.add(buildMetricCard("Unread Updates", notificationCountValue));
+        card.add(metrics, BorderLayout.NORTH);
+        card.add(createDashboardUpdatesCard(), BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel createDashboardUpdatesCard() {
+        JPanel card = new JPanel(new BorderLayout(12, 12));
+        card.setBackground(UiTheme.PANEL_BACKGROUND);
+        card.setBorder(UiTheme.cardBorder());
+
+        JLabel title = new JLabel("Status Change Summary");
+        title.setFont(UiTheme.SECTION_FONT);
+        card.add(title, BorderLayout.NORTH);
+        card.add(new JScrollPane(dashboardNotificationArea), BorderLayout.CENTER);
+
+        JButton openApplicationsButton = UiTheme.primaryButton("Review Applications");
+        openApplicationsButton.addActionListener(e -> {
+            refreshApplications();
+            cardLayout.show(contentPanel, CARD_APPLICATIONS);
+        });
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        footer.setOpaque(false);
+        footer.add(openApplicationsButton);
+        card.add(footer, BorderLayout.SOUTH);
         return card;
     }
 
@@ -819,6 +868,9 @@ public class TaDashboardFrame extends JFrame {
             return;
         }
 
+        if (notificationService != null) {
+            notificationService.markApplicationNotificationsAsRead(email, application.applicationId());
+        }
         applicationTitleLabel.setText(application.moduleCode() + ": " + application.jobTitle());
         applicationMetaLabel.setText("Applied " + formatTimestamp(application.appliedAt()) + " | Status " + application.status());
         applicationNotesArea.setText(switch (application.status()) {
@@ -828,6 +880,7 @@ public class TaDashboardFrame extends JFrame {
             default -> "This application is still pending review. You can withdraw it before the module organiser records a decision.";
         });
         withdrawButton.setEnabled("PENDING".equalsIgnoreCase(application.status()));
+        refreshDashboardSummary();
     }
 
     private void withdrawSelectedApplication() {
@@ -866,6 +919,96 @@ public class TaDashboardFrame extends JFrame {
         cvStatusValue.setText(profile.cvFilePath().isBlank() ? "Not Uploaded" : "Uploaded");
         openJobsValue.setText(Integer.toString(jobPostingService.browseOpenJobs().size()));
         applicationCountValue.setText(Integer.toString(applicationService.listApplicationsForTa(email).size()));
+        int unreadCount = notificationService == null ? 0 : notificationService.unreadCount(email, "TA");
+        notificationCountValue.setText(Integer.toString(unreadCount));
+        notificationsButton.setText("Notifications (" + unreadCount + ")");
+        dashboardNotificationArea.setText(buildDashboardNotificationSummary());
+    }
+
+    private boolean isProfileReady(TaProfile profile) {
+        return !profile.fullName().isBlank()
+                && !profile.studentId().isBlank()
+                && !profile.contactEmail().isBlank();
+    }
+
+    private void updateCvLabel() {
+        currentCvLabel.setText(selectedCvPath.isBlank() ? "No CV uploaded" : extractFileName(selectedCvPath));
+    }
+
+    private String extractFileName(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String normalized = value.replace('\\', '/');
+        int slashIndex = normalized.lastIndexOf('/');
+        return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
+    }
+
+    private String formatTimestamp(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            return OffsetDateTime.parse(value).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        } catch (DateTimeParseException ex) {
+            return value;
+        }
+    }
+
+    private String buildDashboardNotificationSummary() {
+        if (notificationService == null) {
+            return "No notification service is configured.";
+        }
+        List<NotificationRecord> unreadNotifications = notificationService.listUnreadNotificationsFor(email, "TA");
+        if (unreadNotifications.isEmpty()) {
+            return "No new status changes since your last review.";
+        }
+        StringBuilder builder = new StringBuilder("Unread updates").append(System.lineSeparator()).append(System.lineSeparator());
+        unreadNotifications.stream().limit(5).forEach(notification -> builder
+                .append("- ")
+                .append(notification.title())
+                .append(" - ")
+                .append(notification.message())
+                .append(" (")
+                .append(formatTimestamp(notification.createdAt()))
+                .append(')')
+                .append(System.lineSeparator()));
+        if (unreadNotifications.size() > 5) {
+            builder.append(System.lineSeparator()).append("Open Notifications to view the remaining updates.");
+        }
+        return builder.toString();
+    }
+
+    private void showNotificationsDialog() {
+        if (notificationService == null) {
+            JOptionPane.showMessageDialog(this, "Notifications are not available.");
+            return;
+        }
+        List<NotificationRecord> notifications = notificationService.listNotificationsFor(email, "TA");
+        JTextArea area = buildReadonlyTextArea();
+        area.setRows(12);
+        area.setText(buildNotificationDialogText(notifications));
+        JScrollPane pane = new JScrollPane(area);
+        pane.setPreferredSize(new Dimension(540, 280));
+        JOptionPane.showMessageDialog(this, pane, "Notifications", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private String buildNotificationDialogText(List<NotificationRecord> notifications) {
+        if (notifications.isEmpty()) {
+            return "No notifications yet.";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (NotificationRecord notification : notifications) {
+            builder.append(notification.isRead() ? "[Read] " : "[New] ")
+                    .append(notification.title())
+                    .append(System.lineSeparator())
+                    .append(notification.message())
+                    .append(System.lineSeparator())
+                    .append(formatTimestamp(notification.createdAt()))
+                    .append(System.lineSeparator())
+                    .append(System.lineSeparator());
+        }
+        return builder.toString().trim();
     }
 
     private void updateSelectedJobAnalysis() {
@@ -922,36 +1065,6 @@ public class TaDashboardFrame extends JFrame {
         }
         panel.revalidate();
         panel.repaint();
-    }
-
-    private boolean isProfileReady(TaProfile profile) {
-        return !profile.fullName().isBlank()
-                && !profile.studentId().isBlank()
-                && !profile.contactEmail().isBlank();
-    }
-
-    private void updateCvLabel() {
-        currentCvLabel.setText(selectedCvPath.isBlank() ? "No CV uploaded" : extractFileName(selectedCvPath));
-    }
-
-    private String extractFileName(String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        String normalized = value.replace('\\', '/');
-        int slashIndex = normalized.lastIndexOf('/');
-        return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized;
-    }
-
-    private String formatTimestamp(String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        try {
-            return OffsetDateTime.parse(value).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        } catch (DateTimeParseException ex) {
-            return value;
-        }
     }
 
     static String jobListItemText(JobPosting job) {

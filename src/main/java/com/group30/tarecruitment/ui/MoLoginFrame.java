@@ -7,6 +7,8 @@ import com.group30.tarecruitment.jobs.JobPostingService;
 import com.group30.tarecruitment.matching.SkillMatchingService;
 import com.group30.tarecruitment.mo.MoLoginResult;
 import com.group30.tarecruitment.mo.MoLoginService;
+import com.group30.tarecruitment.notifications.CsvNotificationRepository;
+import com.group30.tarecruitment.notifications.NotificationService;
 import com.group30.tarecruitment.profile.CsvTaProfileRepository;
 
 import javax.swing.JButton;
@@ -65,9 +67,17 @@ public class MoLoginFrame extends JFrame {
                             new CsvJobApplicationRepository(Path.of("data", "job_application.csv")),
                             new CsvJobPostingRepository(Path.of("data", "job_posting.csv")),
                             new CsvTaProfileRepository(Path.of("data", "ta_profile.csv")),
+                            new NotificationService(
+                                    new CsvNotificationRepository(Path.of("data", "notifications.csv")),
+                                    Clock.systemDefaultZone()
+                            ),
                             Clock.systemDefaultZone()
                     ),
                     new SkillMatchingService(),
+                    new NotificationService(
+                            new CsvNotificationRepository(Path.of("data", "notifications.csv")),
+                            Clock.systemDefaultZone()
+                    ),
                     () -> {
                     }
             ).setVisible(true);
