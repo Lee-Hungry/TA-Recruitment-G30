@@ -696,6 +696,7 @@ public class MoDashboardFrame extends JFrame {
             applicantsTable.setRowSelectionInterval(0, 0);
         } else {
             showSelectedApplicant(null);
+            applicantRecommendationArea.setText("No pending applicants are available for AI review on this posting.");
         }
     }
 
